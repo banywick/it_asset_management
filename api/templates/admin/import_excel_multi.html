@@ -1,0 +1,55 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 20px auto; padding: 20px; background: white; border-radius: 8px;">
+    <h1>{{ title }}</h1>
+    <p style="color: #666; margin-bottom: 20px;">{{ description }}</p>
+    
+    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+        <h3>📋 Инструкция по загрузке:</h3>
+        <ul>
+            {% for instruction in instructions %}
+            <li>{{ instruction|safe }}</li>
+            {% endfor %}
+        </ul>
+        
+        <h4>📎 Пример структуры файла:</h4>
+        <pre style="background: #fff; padding: 10px; border: 1px solid #ddd; overflow-x: auto; font-size: 12px;">
+{{ example }}
+        </pre>
+    </div>
+    
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div style="margin-bottom: 20px;">
+            <label for="excel_file" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                Выберите Excel файл (с несколькими листами):
+            </label>
+            <input type="file" name="excel_file" id="excel_file" accept=".xlsx,.xls" required 
+                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+        </div>
+        
+        <div style="display: flex; gap: 10px;">
+            <button type="submit" style="background: #79aec8; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer;">
+                📤 Загрузить и импортировать
+            </button>
+            <a href="{% url 'admin:index' %}" style="background: #f0f0f0; color: #333; padding: 10px 20px; text-decoration: none; border-radius: 4px;">
+                ↩️ Назад
+            </a>
+        </div>
+    </form>
+    
+    {% if messages %}
+    <div style="margin-top: 20px;">
+        {% for message in messages %}
+        <div class="{% if message.tags == 'success' %}alert-success{% else %}alert-error{% endif %}" 
+             style="padding: 10px; margin-bottom: 10px; border-radius: 4px; white-space: pre-line;
+                    {% if message.tags == 'success' %}background: #d4edda; color: #155724; border: 1px solid #c3e6cb;
+                    {% else %}background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;{% endif %}">
+            {{ message|linebreaks }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
