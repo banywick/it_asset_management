@@ -12,6 +12,8 @@ router.register(r'tvs', TVViewSet)
 router.register(r'mfps', MFPViewSet)
 router.register(r'ups', UPSViewSet)
 router.register(r'locations', LocationViewSet)
+router.register(r'battery-history', BatteryHistoryViewSet)
+router.register(r'global-search', GlobalSearchViewSet, basename='global-search')
 
 urlpatterns = [
     path('', include(router.urls)),

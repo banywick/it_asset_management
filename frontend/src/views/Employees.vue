@@ -4,34 +4,7 @@
 
     <!-- Форма добавления сотрудника -->
     <div class="form-card">
-      <h3>➕ Добавить сотрудника</h3>
-      
-      <!-- Поле поиска существующего сотрудника -->
-      <div class="form-group">
-        <label>🔍 Найти сотрудника (по фамилии):</label>
-        <div class="search-wrapper">
-          <input 
-            type="text" 
-            v-model="lastNameSearch" 
-            @input="searchByLastName" 
-            @focus="searchByLastName"
-            placeholder="Введите фамилию для поиска..."
-            class="search-input"
-          >
-          <div v-if="lastNameSearchResults.length" class="search-results">
-            <div 
-              v-for="emp in lastNameSearchResults" 
-              :key="emp.id" 
-              @click="selectEmployeeByLastName(emp)"
-              class="search-result-item"
-            >
-              <strong>{{ emp.last_name }}</strong> {{ emp.first_name }} {{ emp.patronymic || '' }}
-              <span class="dept-hint">{{ emp.department_name || 'нет отдела' }}</span>
-            </div>
-          </div>
-        </div>
-        <small class="field-hint">При выборе существующего сотрудника поля ниже заполнятся автоматически</small>
-      </div>
+      <h3>➕ Добавить нового сотрудника</h3>
 
       <div class="form-row">
         <div class="form-group">
@@ -322,10 +295,6 @@ const workplaces = ref([])
 const computers = ref([])
 const allDepartments = ref([])
 
-// Поиск по фамилии
-const lastNameSearch = ref('')
-const lastNameSearchResults = ref([])
-
 // Поиск отделов для формы добавления
 const departmentSearch = ref('')
 const departmentSearchResults = ref([])
@@ -437,31 +406,6 @@ const fetchAllData = async () => {
   }
 }
 
-// Поиск сотрудников по фамилии
-const searchByLastName = () => {
-  if (!lastNameSearch.value) {
-    lastNameSearchResults.value = []
-    return
-  }
-  lastNameSearchResults.value = employees.value.filter(emp => 
-    emp.last_name.toLowerCase().includes(lastNameSearch.value.toLowerCase())
-  ).slice(0, 10)
-}
-
-// Выбор сотрудника по фамилии (автозаполнение)
-const selectEmployeeByLastName = (employee) => {
-  newEmployee.value = {
-    last_name: employee.last_name,
-    first_name: employee.first_name,
-    patronymic: employee.patronymic || '',
-    department: employee.department
-  }
-  selectedDepartment.value = allDepartments.value.find(d => d.id === employee.department) || null
-  lastNameSearch.value = ''
-  lastNameSearchResults.value = []
-  showSuccess(`Данные сотрудника "${employee.last_name} ${employee.first_name}" загружены для редактирования`)
-}
-
 // Поиск отделов для формы добавления
 const searchDepartments = () => {
   if (!departmentSearch.value) {
@@ -499,7 +443,7 @@ const addEmployee = async () => {
   )
   
   if (existingEmployee) {
-    showWarning('Такой сотрудник уже существует! Используйте поиск для редактирования.')
+    showWarning('Такой сотрудник уже существует!')
     return
   }
   
@@ -521,7 +465,6 @@ const addEmployee = async () => {
       department: null
     }
     selectedDepartment.value = null
-    lastNameSearch.value = ''
     departmentSearch.value = ''
     
     await fetchAllData()
@@ -702,13 +645,6 @@ h1 {
   margin-bottom: 0;
 }
 
-.field-hint {
-  display: block;
-  margin-top: 5px;
-  font-size: 0.75rem;
-  color: #999;
-}
-
 .search-input {
   width: 100%;
   padding: 12px 15px;
@@ -747,20 +683,10 @@ h1 {
   cursor: pointer;
   border-bottom: 1px solid #eee;
   transition: background 0.2s;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 .search-result-item:hover {
   background: #f0f0f0;
-}
-
-.dept-hint {
-  font-size: 0.75rem;
-  color: #999;
 }
 
 .selected-tag {
@@ -1125,15 +1051,6 @@ h1 {
   color: #666;
   margin-bottom: 1.5rem;
   font-size: 0.9rem;
-}
-
-.modal-content input, .modal-content select {
-  width: 100%;
-  margin-bottom: 1rem;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 1rem;
 }
 
 .modal-buttons {

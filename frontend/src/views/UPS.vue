@@ -6,74 +6,34 @@
     <div class="form-card">
       <h3>➕ Добавить ИБП</h3>
       
-      <div class="form-group">
-        <label>Номер основного средства:</label>
-        <input 
-          v-model="newUPS.asset_number" 
-          placeholder="Например: ИБП-001"
-          class="main-field"
-        >
-        <small class="field-hint">По умолчанию: "не определен"</small>
-      </div>
-      
-      <div class="form-group">
-        <label>Модель ИБП:</label>
-        <div class="search-wrapper">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Номер основного средства:</label>
           <input 
-            type="text" 
-            v-model="modelSearch" 
-            @input="searchModels" 
-            @focus="searchModels"
-            placeholder="Введите модель ИБП для поиска..."
+            v-model="newUPS.asset_number" 
+            placeholder="Например: ИБП-001"
+            class="main-field"
+          >
+          <small class="field-hint">По умолчанию: "не определен"</small>
+        </div>
+        
+        <div class="form-group">
+          <label>Модель ИБП:</label>
+          <input 
+            v-model="newUPS.model" 
+            placeholder="Модель ИБП"
             class="search-input"
           >
-          <div v-if="modelSearchResults.length" class="search-results">
-            <div 
-              v-for="ups in modelSearchResults" 
-              :key="ups.id" 
-              @click="selectModel(ups)"
-              class="search-result-item"
-            >
-              {{ ups.model }}
-            </div>
-          </div>
         </div>
-        <div v-if="selectedModel" class="selected-tag">
-          {{ selectedModel.model }}
-          <button @click="selectedModel = null" class="remove-btn">×</button>
-        </div>
-        <button @click="openAddModelModal" type="button" class="small-btn">➕ Добавить новую модель</button>
       </div>
 
-      <!-- Отдел - выпадающий список из базы -->
       <div class="form-group">
-        <label>Отдел:</label>
-        <select v-model="newUPS.department" class="search-input">
-          <option :value="null">Без отдела</option>
-          <option v-for="dep in allDepartments" :key="dep.id" :value="dep.id">
-            {{ dep.name }}
-          </option>
+        <label>Статус:</label>
+        <select v-model="newUPS.status" class="search-input">
+          <option value="active">✅ Активен</option>
+          <option value="repair">🔧 В ремонте</option>
+          <option value="replaced">🔄 Заменен временно</option>
         </select>
-        <button @click="openAddDepartmentModal" type="button" class="small-btn">➕ Добавить новый отдел</button>
-      </div>
-
-      <div class="form-group">
-        <label>Серийный номер аккумулятора (необязательно):</label>
-        <input 
-          v-model="newUPS.battery_serial_number" 
-          placeholder="Например: BAT-2024-001"
-          class="search-input"
-        >
-      </div>
-
-      <div class="form-group">
-        <label>Дата замены аккумулятора:</label>
-        <input 
-          v-model="newUPS.battery_replaced_at" 
-          type="date"
-          class="search-input"
-        >
-        <small class="field-hint">Укажите дату последней замены аккумулятора</small>
       </div>
 
       <div class="form-group">
@@ -84,7 +44,6 @@
           rows="3"
           class="textarea-field"
         ></textarea>
-        <small class="field-hint">Место расположения, особенности и т.д.</small>
       </div>
 
       <button @click="addUPS" class="submit-btn">💾 Добавить ИБП</button>
@@ -92,50 +51,58 @@
 
     <!-- Список ИБП -->
     <div class="list">
-      <h3>📋 Список ИБП</h3>
-      <div v-for="ups in upsList" :key="ups.id" class="card">
-        <div class="card-header">
-          <strong>ОС №{{ ups.asset_number }}</strong>
-          <div class="card-actions">
-            <button @click="openEditModal(ups)" class="edit-btn">✏️ Редактировать</button>
-            <button @click="deleteUPS(ups.id)" class="delete-btn">🗑️ Удалить</button>
+      <h3>📋 Список ИБП ({{ upsList.length }} шт.)</h3>
+      <div class="cards-grid">
+        <div v-for="ups in paginatedUPS" :key="ups.id" class="card">
+          <div class="card-header">
+            <div class="ups-title">
+              <strong>ОС №{{ ups.asset_number }}</strong>
+              <span :class="['status-badge', getStatusClass(ups.status)]">
+                {{ getStatusText(ups.status) }}
+              </span>
+            </div>
+            <div class="card-actions">
+              <button @click="openServiceModal(ups)" class="service-btn" title="Обслуживание">🔧</button>
+              <button @click="openEditModal(ups)" class="edit-btn" title="Редактировать">✏️</button>
+              <button @click="deleteUPS(ups.id)" class="delete-btn" title="Удалить">🗑️</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="info-row">
+              <span class="label">🔋 Модель:</span>
+              <span class="value">{{ ups.model }}</span>
+            </div>
+            <div v-if="ups.comment" class="info-row">
+              <span class="label">💬 Комментарий:</span>
+              <span class="value comment">{{ ups.comment }}</span>
+            </div>
+            <div v-if="ups.replacement_ups_detail" class="info-row replacement-info">
+              <span class="label">🔄 Временная замена:</span>
+              <span class="value">ОС №{{ ups.replacement_ups_detail.asset_number }} - {{ ups.replacement_ups_detail.model }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">📅 Последняя замена АКБ:</span>
+              <span class="value">
+                <span v-if="ups.battery_history && ups.battery_history.length">
+                  {{ formatDate(ups.battery_history[0].replaced_at) }}
+                  <span class="battery-serial">({{ ups.battery_history[0].new_battery_serial }})</span>
+                </span>
+                <span v-else class="no-data">не заменялся</span>
+              </span>
+            </div>
           </div>
         </div>
-        <div class="card-body">
-          <div>🔋 Модель: <strong>{{ ups.model }}</strong></div>
-          <div>📍 Отдел: {{ ups.department_name || 'Не указан' }}</div>
-          <div v-if="ups.battery_serial_number">🔧 Аккумулятор: {{ ups.battery_serial_number }}</div>
-          <div v-if="ups.battery_replaced_at">📅 Замена аккумулятора: {{ formatDate(ups.battery_replaced_at) }}</div>
-          <div v-if="ups.comment" class="comment-info">💬 {{ ups.comment }}</div>
-        </div>
+      </div>
+
+      <!-- Пагинация -->
+      <div v-if="totalPages > 1" class="pagination">
+        <button @click="prevPage" :disabled="currentPage === 1" class="page-btn">◀ Предыдущая</button>
+        <span class="page-info">Страница {{ currentPage }} из {{ totalPages }}</span>
+        <button @click="nextPage" :disabled="currentPage === totalPages" class="page-btn">Следующая ▶</button>
       </div>
     </div>
 
-    <!-- Модальное окно добавления новой модели -->
-    <div v-if="showModelModal" class="modal">
-      <div class="modal-content">
-        <h3>➕ Добавить новую модель ИБП</h3>
-        <input v-model="newModelName" placeholder="Модель ИБП">
-        <div class="modal-buttons">
-          <button @click="addModel" class="save-btn">Сохранить</button>
-          <button @click="showModelModal = false" class="cancel-btn">Отмена</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Модальное окно добавления отдела -->
-    <div v-if="showDepartmentModal" class="modal">
-      <div class="modal-content">
-        <h3>➕ Добавить новый отдел</h3>
-        <input v-model="newDepartmentName" placeholder="Название отдела">
-        <div class="modal-buttons">
-          <button @click="addDepartment" class="save-btn">Сохранить</button>
-          <button @click="showDepartmentModal = false" class="cancel-btn">Отмена</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Модальное окно редактирования -->
+    <!-- Модальное окно редактирования с поиском для временной замены -->
     <div v-if="showEditModal" class="modal">
       <div class="modal-content modal-large">
         <h3>✏️ Редактировать ИБП</h3>
@@ -147,47 +114,119 @@
         
         <div class="form-group">
           <label>Модель ИБП:</label>
-          <select v-model="editUPS.model" class="search-input">
-            <option :value="null">Выберите модель</option>
-            <option v-for="model in allModels" :key="model.id" :value="model.model">
-              {{ model.model }}
-            </option>
+          <input v-model="editUPS.model" class="search-input">
+        </div>
+        
+        <div class="form-group">
+          <label>Статус:</label>
+          <select v-model="editUPS.status" class="search-input">
+            <option value="active">✅ Активен</option>
+            <option value="repair">🔧 В ремонте</option>
+            <option value="replaced">🔄 Заменен временно</option>
           </select>
-        </div>
-        
-        <div class="form-group">
-          <label>Отдел:</label>
-          <select v-model="editUPS.department" class="search-input">
-            <option :value="null">Без отдела</option>
-            <option v-for="dep in allDepartments" :key="dep.id" :value="dep.id">
-              {{ dep.name }}
-            </option>
-          </select>
-        </div>
-        
-        <div class="form-group">
-          <label>Серийный номер аккумулятора:</label>
-          <input v-model="editUPS.battery_serial_number" class="search-input">
-        </div>
-        
-        <div class="form-group">
-          <label>Дата замены аккумулятора:</label>
-          <input v-model="editUPS.battery_replaced_at" type="date" class="search-input">
         </div>
         
         <div class="form-group">
           <label>Комментарий:</label>
-          <textarea 
-            v-model="editUPS.comment" 
-            placeholder="Дополнительная информация..."
-            rows="3"
-            class="textarea-field"
-          ></textarea>
+          <textarea v-model="editUPS.comment" rows="3" class="textarea-field"></textarea>
+        </div>
+        
+        <!-- Временная замена с поиском -->
+        <div class="form-group">
+          <label>Временная замена (ИБП):</label>
+          <div class="search-wrapper">
+            <input 
+              type="text" 
+              v-model="replacementSearch" 
+              @input="searchReplacementUPS" 
+              @focus="searchReplacementUPS"
+              placeholder="Введите номер ОС или модель ИБП..."
+              class="search-input"
+            >
+            <div v-if="replacementSearchResults.length" class="search-results">
+              <div 
+                v-for="item in replacementSearchResults" 
+                :key="item.id" 
+                @click="selectReplacementUPS(item)"
+                class="search-result-item"
+              >
+                ОС №{{ item.asset_number }} - {{ item.model }}
+                <span :class="['status-badge-small', getStatusClass(item.status)]">
+                  {{ getStatusText(item.status) }}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div v-if="selectedReplacementUPS" class="selected-tag">
+            ОС №{{ selectedReplacementUPS.asset_number }} - {{ selectedReplacementUPS.model }}
+            <span :class="['status-badge-small', getStatusClass(selectedReplacementUPS.status)]">
+              {{ getStatusText(selectedReplacementUPS.status) }}
+            </span>
+            <button @click="clearReplacementUPS" class="remove-btn">×</button>
+          </div>
         </div>
         
         <div class="modal-buttons">
           <button @click="updateUPS" class="save-btn">💾 Сохранить</button>
-          <button @click="showEditModal = false" class="cancel-btn">Отмена</button>
+          <button @click="closeEditModal" class="cancel-btn">Отмена</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно обслуживания -->
+    <div v-if="showServiceModal" class="modal">
+      <div class="modal-content modal-large">
+        <h3>🔧 Обслуживание ИБП</h3>
+        <p class="modal-subtitle">ИБП: <strong>ОС №{{ selectedUPSForService?.asset_number }} - {{ selectedUPSForService?.model }}</strong></p>
+        
+        <!-- Форма добавления замены -->
+        <div class="service-form">
+          <h4>➕ Замена аккумулятора</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Извлеченный АКБ:</label>
+              <input v-model="newBattery.old_battery_serial" placeholder="Серийный номер извлеченного АКБ" class="search-input">
+            </div>
+            <div class="form-group">
+              <label>Установленный АКБ:</label>
+              <input v-model="newBattery.new_battery_serial" placeholder="Серийный номер нового АКБ" class="search-input" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Кто выполнил замену:</label>
+            <input v-model="newBattery.performed_by" placeholder="ФИО сотрудника" class="search-input">
+          </div>
+          <div class="form-group">
+            <label>Комментарий:</label>
+            <textarea v-model="newBattery.comment" placeholder="Дополнительная информация о замене..." rows="2" class="textarea-field"></textarea>
+          </div>
+          <button @click="addBatteryHistory" class="submit-btn small">💾 Добавить запись</button>
+        </div>
+        
+        <!-- История замен -->
+        <div class="history-section">
+          <h4>📋 История замен аккумуляторов</h4>
+          <div v-if="batteryHistory.length" class="history-list">
+            <div v-for="record in batteryHistory" :key="record.id" class="history-item">
+              <div class="history-header">
+                <span class="history-date">{{ formatDate(record.replaced_at) }}</span>
+                <button @click="deleteBatteryHistory(record.id)" class="delete-small" title="Удалить запись">🗑️</button>
+              </div>
+              <div class="history-details">
+                <div>📤 Извлечен: <strong>{{ record.old_battery_serial || 'не указан' }}</strong></div>
+                <div>📥 Установлен: <strong>{{ record.new_battery_serial }}</strong></div>
+                <div v-if="record.performed_by">👤 Кто: {{ record.performed_by }}</div>
+                <div v-if="record.comment">💬 {{ record.comment }}</div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="no-data">
+            <p>😕 История замен отсутствует</p>
+          </div>
+        </div>
+        
+        <div class="modal-buttons">
+          <button @click="closeServiceModal" class="cancel-btn">Закрыть</button>
         </div>
       </div>
     </div>
@@ -198,40 +237,29 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { showSuccess, showError, showWarning } from '../utils/toast'
 import ConfirmModal from '../components/ConfirmModal.vue'
 
 const API = 'http://localhost:8000/api'
 
-// Данные
 const upsList = ref([])
-const allModels = ref([])
-const allDepartments = ref([])
+const batteryHistory = ref([])
 
-// Выбранные значения для добавления
-const selectedModel = ref(null)
-
-// Поисковые запросы
-const modelSearch = ref('')
-const modelSearchResults = ref([])
+// Пагинация
+const currentPage = ref(1)
+const itemsPerPage = 4
 
 // Модальные окна
-const showModelModal = ref(false)
-const showDepartmentModal = ref(false)
 const showEditModal = ref(false)
-
-// Новые данные
-const newModelName = ref('')
-const newDepartmentName = ref('')
+const showServiceModal = ref(false)
 
 // Данные для нового ИБП
 const newUPS = ref({
   asset_number: 'не определен',
-  department: null,
-  battery_serial_number: '',
-  battery_replaced_at: '',
+  model: '',
+  status: 'active',
   comment: ''
 })
 
@@ -239,103 +267,158 @@ const newUPS = ref({
 const editUPS = ref({
   id: null,
   asset_number: '',
-  model: null,
-  department: null,
-  battery_serial_number: '',
-  battery_replaced_at: '',
+  model: '',
+  status: 'active',
+  comment: '',
+  replacement_ups: null
+})
+
+// Поиск для временной замены
+const replacementSearch = ref('')
+const replacementSearchResults = ref([])
+const selectedReplacementUPS = ref(null)
+
+// Данные для обслуживания
+const selectedUPSForService = ref(null)
+const newBattery = ref({
+  old_battery_serial: '',
+  new_battery_serial: '',
+  performed_by: '',
   comment: ''
 })
 
-// Ref для модального окна подтверждения
 const confirmModal = ref(null)
+
+// Пагинированные ИБП
+const paginatedUPS = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  const end = start + itemsPerPage
+  return upsList.value.slice(start, end)
+})
+
+const totalPages = computed(() => {
+  return Math.ceil(upsList.value.length / itemsPerPage)
+})
 
 // Форматирование даты
 const formatDate = (date) => {
   if (!date) return ''
-  const d = new Date(date)
-  return d.toLocaleDateString('ru-RU')
+  return new Date(date).toLocaleDateString('ru-RU')
+}
+
+// Статусы
+const getStatusText = (status) => {
+  const statusMap = {
+    'active': 'Активен',
+    'repair': 'В ремонте',
+    'replaced': 'Заменен временно'
+  }
+  return statusMap[status] || status
+}
+
+const getStatusClass = (status) => {
+  const classMap = {
+    'active': 'status-active',
+    'repair': 'status-repair',
+    'replaced': 'status-replaced'
+  }
+  return classMap[status] || ''
+}
+
+// Пагинация
+const prevPage = () => {
+  if (currentPage.value > 1) {
+    currentPage.value--
+  }
+}
+
+const nextPage = () => {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++
+  }
 }
 
 // Загрузка данных
 const fetchAllData = async () => {
   try {
-    const [upsRes, depRes] = await Promise.all([
-      axios.get(`${API}/ups/`),
-      axios.get(`${API}/departments/`)
-    ])
+    const upsRes = await axios.get(`${API}/ups/`)
     upsList.value = upsRes.data
-    allDepartments.value = depRes.data
-    
-    // Извлекаем уникальные модели из существующих ИБП
-    const uniqueModels = []
-    const modelMap = new Map()
-    upsRes.data.forEach(ups => {
-      if (!modelMap.has(ups.model)) {
-        modelMap.set(ups.model, { id: ups.id, model: ups.model })
-        uniqueModels.push({ id: ups.id, model: ups.model })
-      }
-    })
-    allModels.value = uniqueModels
+    console.log('Загружено ИБП:', upsList.value.length)
   } catch (error) {
     console.error('Ошибка загрузки:', error)
     showError('Ошибка загрузки данных: ' + (error.response?.data?.detail || error.message))
   }
 }
 
-// Поиск моделей
-const searchModels = () => {
-  if (!modelSearch.value) {
-    modelSearchResults.value = []
+// Загрузка истории замен
+const fetchBatteryHistory = async (upsId) => {
+  try {
+    const response = await axios.get(`${API}/battery-history/?ups=${upsId}`)
+    batteryHistory.value = response.data
+  } catch (error) {
+    console.error('Ошибка загрузки истории:', error)
+    showError('Ошибка загрузки истории замен')
+  }
+}
+
+// Поиск ИБП для временной замены
+const searchReplacementUPS = () => {
+  if (!replacementSearch.value) {
+    replacementSearchResults.value = []
     return
   }
-  modelSearchResults.value = allModels.value.filter(m => 
-    m.model.toLowerCase().includes(modelSearch.value.toLowerCase())
+  replacementSearchResults.value = upsList.value.filter(item => 
+    item.id !== editUPS.value.id && (
+      item.asset_number.toLowerCase().includes(replacementSearch.value.toLowerCase()) ||
+      item.model.toLowerCase().includes(replacementSearch.value.toLowerCase())
+    )
   ).slice(0, 10)
 }
 
-// Выбор модели
-const selectModel = (model) => {
-  selectedModel.value = model
-  modelSearch.value = ''
-  modelSearchResults.value = []
+// Выбор ИБП для временной замены
+const selectReplacementUPS = (item) => {
+  selectedReplacementUPS.value = item
+  editUPS.value.replacement_ups = item.id
+  replacementSearch.value = ''
+  replacementSearchResults.value = []
+}
+
+// Очистка выбранного ИБП для временной замены
+const clearReplacementUPS = () => {
+  selectedReplacementUPS.value = null
+  editUPS.value.replacement_ups = null
+  replacementSearch.value = ''
+  replacementSearchResults.value = []
 }
 
 // Добавление ИБП
 const addUPS = async () => {
-  if (!selectedModel.value) {
-    showWarning('Пожалуйста, выберите или добавьте модель ИБП')
-    return
-  }
-  
-  if (!newUPS.value.asset_number) {
-    showWarning('Пожалуйста, укажите номер основного средства')
+  if (!newUPS.value.model) {
+    showWarning('Пожалуйста, укажите модель ИБП')
     return
   }
   
   try {
     const upsData = {
-      asset_number: newUPS.value.asset_number,
-      model: selectedModel.value.model,
-      department: newUPS.value.department || null,
-      battery_serial_number: newUPS.value.battery_serial_number || null,
-      battery_replaced_at: newUPS.value.battery_replaced_at || null,
+      asset_number: newUPS.value.asset_number || 'не определен',
+      model: newUPS.value.model,
+      status: newUPS.value.status,
       comment: newUPS.value.comment || null
     }
     
-    await axios.post(`${API}/ups/`, upsData)
+    console.log('Отправляем данные:', upsData)
+    const response = await axios.post(`${API}/ups/`, upsData)
+    console.log('Ответ:', response.data)
     
-    // Сброс формы
     newUPS.value = {
       asset_number: 'не определен',
-      department: null,
-      battery_serial_number: '',
-      battery_replaced_at: '',
+      model: '',
+      status: 'active',
       comment: ''
     }
-    selectedModel.value = null
-    modelSearch.value = ''
     
     await fetchAllData()
+    currentPage.value = Math.ceil(upsList.value.length / itemsPerPage)
     showSuccess('ИБП успешно добавлен!')
   } catch (error) {
     console.error('Ошибка добавления:', error)
@@ -343,103 +426,60 @@ const addUPS = async () => {
   }
 }
 
-// Открытие модального окна добавления модели
-const openAddModelModal = () => {
-  showModelModal.value = true
-  newModelName.value = modelSearch.value
-}
-
-// Добавление новой модели
-const addModel = async () => {
-  if (!newModelName.value.trim()) {
-    showWarning('Введите модель ИБП')
-    return
-  }
-  
-  try {
-    const tempUPS = {
-      asset_number: `TEMP-${Date.now()}`,
-      model: newModelName.value,
-      department: null,
-      battery_serial_number: null,
-      battery_replaced_at: null,
-      comment: null
-    }
-    
-    const response = await axios.post(`${API}/ups/`, tempUPS)
-    
-    allModels.value.push({ id: response.data.id, model: newModelName.value })
-    selectedModel.value = { id: response.data.id, model: newModelName.value }
-    
-    showModelModal.value = false
-    newModelName.value = ''
-    modelSearch.value = ''
-    showSuccess('Модель добавлена!')
-  } catch (error) {
-    console.error('Ошибка добавления модели:', error)
-    showError('Ошибка добавления модели')
-  }
-}
-
-// Открытие модального окна добавления отдела
-const openAddDepartmentModal = () => {
-  showDepartmentModal.value = true
-  newDepartmentName.value = ''
-}
-
-// Добавление отдела
-const addDepartment = async () => {
-  if (!newDepartmentName.value.trim()) {
-    showWarning('Введите название отдела')
-    return
-  }
-  
-  try {
-    const response = await axios.post(`${API}/departments/`, { name: newDepartmentName.value })
-    await fetchAllData()
-    newUPS.value.department = response.data.id
-    showDepartmentModal.value = false
-    newDepartmentName.value = ''
-    showSuccess('Отдел добавлен!')
-  } catch (error) {
-    console.error('Ошибка добавления отдела:', error)
-    showError('Ошибка добавления отдела')
-  }
-}
-
 // Открытие модального окна редактирования
 const openEditModal = (ups) => {
+  console.log('Редактирование ИБП:', ups)
   editUPS.value = {
     id: ups.id,
     asset_number: ups.asset_number,
     model: ups.model,
-    department: ups.department,
-    battery_serial_number: ups.battery_serial_number || '',
-    battery_replaced_at: ups.battery_replaced_at || '',
-    comment: ups.comment || ''
+    status: ups.status || 'active',
+    comment: ups.comment || '',
+    replacement_ups: ups.replacement_ups || null
   }
+  
+  // Устанавливаем выбранный ИБП для временной замены
+  if (ups.replacement_ups_detail) {
+    selectedReplacementUPS.value = ups.replacement_ups_detail
+  } else {
+    selectedReplacementUPS.value = null
+  }
+  
+  replacementSearch.value = ''
+  replacementSearchResults.value = []
   showEditModal.value = true
+}
+
+// Закрытие модального окна редактирования
+const closeEditModal = () => {
+  showEditModal.value = false
+  editUPS.value = {
+    id: null,
+    asset_number: '',
+    model: '',
+    status: 'active',
+    comment: '',
+    replacement_ups: null
+  }
+  selectedReplacementUPS.value = null
+  replacementSearch.value = ''
+  replacementSearchResults.value = []
 }
 
 // Обновление ИБП
 const updateUPS = async () => {
-  if (!editUPS.value.model) {
-    showWarning('Пожалуйста, выберите модель ИБП')
-    return
-  }
-  
   try {
     const upsData = {
       asset_number: editUPS.value.asset_number,
       model: editUPS.value.model,
-      department: editUPS.value.department,
-      battery_serial_number: editUPS.value.battery_serial_number || null,
-      battery_replaced_at: editUPS.value.battery_replaced_at || null,
-      comment: editUPS.value.comment || null
+      status: editUPS.value.status,
+      comment: editUPS.value.comment || null,
+      replacement_ups: editUPS.value.replacement_ups || null
     }
     
+    console.log('Обновляем ИБП:', upsData)
     await axios.put(`${API}/ups/${editUPS.value.id}/`, upsData)
-    showEditModal.value = false
+    closeEditModal()
     await fetchAllData()
     showSuccess('ИБП успешно обновлен!')
   } catch (error) {
@@ -448,7 +488,84 @@ const updateUPS = async () => {
   }
 }
 
-// Удаление ИБП с подтверждением
+// Открытие модального окна обслуживания
+const openServiceModal = async (ups) => {
+  console.log('Обслуживание ИБП:', ups)
+  selectedUPSForService.value = ups
+  await fetchBatteryHistory(ups.id)
+  newBattery.value = {
+    old_battery_serial: '',
+    new_battery_serial: '',
+    performed_by: '',
+    comment: ''
+  }
+  showServiceModal.value = true
+}
+
+// Закрытие модального окна обслуживания
+const closeServiceModal = () => {
+  showServiceModal.value = false
+  selectedUPSForService.value = null
+  batteryHistory.value = []
+}
+
+// Добавление записи о замене АКБ
+const addBatteryHistory = async () => {
+  if (!newBattery.value.new_battery_serial) {
+    showWarning('Пожалуйста, укажите серийный номер установленного аккумулятора')
+    return
+  }
+  
+  try {
+    const historyData = {
+      ups: selectedUPSForService.value.id,
+      old_battery_serial: newBattery.value.old_battery_serial || null,
+      new_battery_serial: newBattery.value.new_battery_serial,
+      performed_by: newBattery.value.performed_by || null,
+      comment: newBattery.value.comment || null
+    }
+    
+    await axios.post(`${API}/battery-history/`, historyData)
+    await fetchBatteryHistory(selectedUPSForService.value.id)
+    await fetchAllData()
+    
+    newBattery.value = {
+      old_battery_serial: '',
+      new_battery_serial: '',
+      performed_by: '',
+      comment: ''
+    }
+    
+    showSuccess('Замена аккумулятора зафиксирована!')
+  } catch (error) {
+    console.error('Ошибка добавления записи:', error)
+    showError('Ошибка добавления записи о замене')
+  }
+}
+
+// Удаление записи об обслуживании
+const deleteBatteryHistory = async (id) => {
+  const confirmed = await confirmModal.value.open({
+    title: 'Удаление записи',
+    message: 'Вы уверены, что хотите удалить эту запись о замене аккумулятора?',
+    confirmText: 'Да, удалить',
+    type: 'danger'
+  })
+  
+  if (confirmed) {
+    try {
+      await axios.delete(`${API}/battery-history/${id}/`)
+      await fetchBatteryHistory(selectedUPSForService.value.id)
+      await fetchAllData()
+      showSuccess('Запись удалена!')
+    } catch (error) {
+      console.error('Ошибка удаления:', error)
+      showError('Ошибка удаления записи')
+    }
+  }
+}
+
+// Удаление ИБП
 const deleteUPS = async (id) => {
   const confirmed = await confirmModal.value.open({
     title: 'Удаление ИБП',
@@ -461,6 +578,9 @@ const deleteUPS = async (id) => {
     try {
       await axios.delete(`${API}/ups/${id}/`)
       await fetchAllData()
+      if (paginatedUPS.value.length === 1 && currentPage.value > 1) {
+        currentPage.value--
+      }
       showSuccess('ИБП удален!')
     } catch (error) {
       console.error('Ошибка удаления:', error)
@@ -469,12 +589,27 @@ const deleteUPS = async (id) => {
   }
 }
 
-onMounted(fetchAllData)
+onMounted(() => {
+  fetchAllData()
+})
 </script>
 
 <style scoped>
+/* ... все предыдущие стили ... */
+
+/* Добавляем стиль для маленького бейджа статуса в результатах поиска */
+.status-badge-small {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 0.65rem;
+  font-weight: 500;
+  margin-left: 8px;
+}
+
+/* Остальные стили из предыдущей версии */
 .page {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -507,6 +642,18 @@ h1 {
   font-weight: 500;
   color: #2c3e50;
   font-size: 0.95rem;
+}
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.form-row .form-group {
+  flex: 1;
+  margin-bottom: 0;
 }
 
 .main-field {
@@ -590,6 +737,10 @@ h1 {
   cursor: pointer;
   border-bottom: 1px solid #eee;
   transition: background 0.2s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .search-result-item:hover {
@@ -606,6 +757,7 @@ h1 {
   font-size: 0.95rem;
   font-weight: 500;
   margin-top: 8px;
+  flex-wrap: wrap;
 }
 
 .remove-btn {
@@ -620,23 +772,6 @@ h1 {
 
 .remove-btn:hover {
   color: #e74c3c;
-}
-
-.small-btn {
-  background: #3498db;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.95rem;
-  margin-top: 10px;
-  transition: background 0.2s;
-  display: inline-block;
-}
-
-.small-btn:hover {
-  background: #2980b9;
 }
 
 .submit-btn {
@@ -657,6 +792,13 @@ h1 {
   background: #16a085;
 }
 
+.submit-btn.small {
+  width: auto;
+  padding: 8px 16px;
+  margin-top: 0;
+  font-size: 0.9rem;
+}
+
 .list {
   background: white;
   padding: 1.5rem;
@@ -670,13 +812,24 @@ h1 {
   font-size: 1.2rem;
 }
 
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .card {
   background: #f8f9fa;
-  padding: 1.2rem;
-  margin-bottom: 1rem;
   border-radius: 12px;
   border-left: 4px solid #1abc9c;
   transition: transform 0.2s, box-shadow 0.2s;
+  overflow: hidden;
 }
 
 .card:hover {
@@ -688,65 +841,242 @@ h1 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem;
-  flex-wrap: wrap;
+  padding: 12px 15px;
+  background: rgba(26, 188, 156, 0.1);
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.ups-title {
+  display: flex;
+  align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
-.card-header strong {
-  font-size: 1.15rem;
+.ups-title strong {
+  font-size: 1rem;
   color: #2c3e50;
-}
-
-.card-body {
-  color: #555;
-  line-height: 1.7;
-}
-
-.card-body div {
-  margin-bottom: 0.35rem;
-}
-
-.comment-info {
-  color: #2c3e50;
-  background: #e8f5e9;
-  padding: 4px 8px;
-  border-radius: 6px;
-  display: inline-block;
-  margin-top: 4px;
 }
 
 .card-actions {
   display: flex;
   gap: 8px;
-  align-items: center;
 }
 
-.edit-btn, .delete-btn {
-  padding: 5px 10px;
+.service-btn, .edit-btn, .delete-btn {
+  background: none;
   border: none;
-  border-radius: 6px;
+  font-size: 1.1rem;
   cursor: pointer;
-  font-size: 0.85rem;
+  padding: 5px;
+  border-radius: 6px;
   transition: all 0.2s;
 }
 
+.service-btn {
+  color: #f39c12;
+}
+
+.service-btn:hover {
+  background: #f39c12;
+  color: white;
+}
+
 .edit-btn {
+  color: #3498db;
+}
+
+.edit-btn:hover {
   background: #3498db;
   color: white;
 }
 
-.edit-btn:hover {
-  background: #2980b9;
+.delete-btn {
+  color: #e74c3c;
 }
 
-.delete-btn {
+.delete-btn:hover {
   background: #e74c3c;
   color: white;
 }
 
-.delete-btn:hover {
-  background: #c0392b;
+.card-body {
+  padding: 12px 15px;
+}
+
+.info-row {
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.label {
+  font-weight: 600;
+  color: #666;
+  min-width: 130px;
+  flex-shrink: 0;
+}
+
+.value {
+  color: #333;
+  flex: 1;
+}
+
+.value.comment {
+  font-style: italic;
+  color: #e67e22;
+}
+
+.replacement-info {
+  background: #fff3cd;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.battery-serial {
+  font-size: 0.7rem;
+  color: #27ae60;
+  margin-left: 5px;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.status-active {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-repair {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.status-replaced {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.no-data {
+  color: #999;
+  font-style: italic;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+}
+
+.page-btn {
+  background: #3498db;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.page-btn:hover:not(:disabled) {
+  background: #2980b9;
+}
+
+.page-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.page-info {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+/* Модальное окно обслуживания */
+.service-form {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.service-form h4 {
+  margin-bottom: 1rem;
+  color: #2c3e50;
+}
+
+.history-section {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.history-section h4 {
+  margin-bottom: 1rem;
+  color: #2c3e50;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.history-item {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 10px;
+  border-left: 3px solid #1abc9c;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #eee;
+}
+
+.history-date {
+  font-weight: 600;
+  color: #1abc9c;
+  font-size: 0.8rem;
+}
+
+.delete-small {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #e74c3c;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.delete-small:hover {
+  background: #e74c3c;
+  color: white;
+}
+
+.history-details {
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.history-details div {
+  margin-bottom: 4px;
 }
 
 .modal {
@@ -767,26 +1097,23 @@ h1 {
   padding: 2rem;
   border-radius: 16px;
   width: 90%;
-  max-width: 500px;
+  max-width: 650px;
   box-shadow: 0 10px 40px rgba(0,0,0,0.2);
 }
 
 .modal-large {
-  max-width: 600px !important;
+  max-width: 650px !important;
 }
 
 .modal-content h3 {
-  margin-bottom: 1.2rem;
+  margin-bottom: 0.5rem;
   color: #2c3e50;
 }
 
-.modal-content input, .modal-content select, .modal-content textarea {
-  width: 100%;
-  margin-bottom: 1rem;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 1rem;
+.modal-subtitle {
+  color: #666;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
 }
 
 .modal-buttons {
@@ -825,19 +1152,32 @@ h1 {
 }
 
 @media (max-width: 768px) {
-  .card-header {
+  .form-row {
     flex-direction: column;
-    align-items: flex-start;
   }
   
-  .card-actions {
-    width: 100%;
-    justify-content: flex-end;
+  .form-row .form-group {
+    margin-bottom: 1rem;
   }
   
   .modal-content {
     padding: 1.5rem;
     margin: 1rem;
+  }
+  
+  .pagination {
+    flex-wrap: wrap;
+  }
+  
+  .label {
+    width: 100%;
+    margin-bottom: 4px;
+  }
+  
+  .search-result-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
   }
 }
 </style>

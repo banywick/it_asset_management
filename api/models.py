@@ -50,14 +50,17 @@ class Workplace(models.Model):
     ]
     
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, verbose_name="Сотрудник")
-    location = models.CharField(max_length=200, verbose_name="Место (кабинет/здание)")
+    location = models.CharField(max_length=200, verbose_name="Место (кабинет/здание)", default="Рабочее место")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', verbose_name="Статус")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
     
-    # Новые поля
+    # Существующие поля
     mfp = models.ForeignKey('MFP', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="МФУ")
     ups = models.ForeignKey('UPS', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Бесперебойник")
     city = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Город/Локация")
+    
+    # Новое поле - компьютер
+    computer = models.ForeignKey('Computer', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Компьютер")
 
     class Meta:
         verbose_name = "Рабочее место"
@@ -90,29 +93,45 @@ class TV(models.Model):
         return f"{self.brand} {self.size}\" - {self.asset_number or 'без номера'}"
 
 class Computer(models.Model):
+    COMPUTER_TYPES = [
+        ('desktop', '🖥️ Стационарный'),
+        ('laptop', '💻 Ноутбук'),
+        ('all-in-one', '🖥️ Моноблок'),
+    ]
+    
+    SERVICE_STATUS = [
+        ('operational', '✅ В эксплуатации'),
+        ('repair', '🔧 В ремонте'),
+        ('upgrade', '⚡ На модернизации'),
+    ]
+    
     asset_number = models.CharField(max_length=100, verbose_name="Номер основного средства", default="не определен")
     
+    # Тип компьютера
+    computer_type = models.CharField(max_length=20, choices=COMPUTER_TYPES, default='desktop', verbose_name="Тип компьютера")
+    
+    # Статус обслуживания
+    service_status = models.CharField(max_length=20, choices=SERVICE_STATUS, default='operational', verbose_name="Статус обслуживания")
+    
+    # Комплектация
     system_unit = models.CharField(max_length=200, verbose_name="Системный блок", blank=True, null=True)
     monitors = models.ManyToManyField(Monitor, blank=True, verbose_name="Мониторы")
     has_keyboard = models.BooleanField(default=False, verbose_name="Клавиатура")
     has_mouse = models.BooleanField(default=False, verbose_name="Мышь")
     
-    department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, verbose_name="Отдел")
     needs_upgrade = models.BooleanField(default=False, verbose_name="Требует модернизации")
-    
-    assigned_to = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Закреплен за сотрудником")
 
     class Meta:
         verbose_name = "Компьютер"
         verbose_name_plural = "Компьютеры"
 
     def __str__(self):
-        return f"ОС №{self.asset_number} - {self.system_unit or 'системный блок не указан'}"
+        type_icon = dict(self.COMPUTER_TYPES).get(self.computer_type, '')
+        return f"{type_icon} ОС №{self.asset_number} - {self.system_unit or 'системный блок не указан'}"
 
 class MFP(models.Model):
     asset_number = models.CharField(max_length=100, verbose_name="Номер основного средства", default="не определен")
     model = models.CharField(max_length=100, verbose_name="Модель МФУ")
-    department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, verbose_name="Отдел")
     ip_address = models.GenericIPAddressField(null=True, blank=True, verbose_name="IP адрес")
 
     class Meta:
@@ -123,16 +142,44 @@ class MFP(models.Model):
         return f"ОС №{self.asset_number} - {self.model}"
 
 class UPS(models.Model):
+    STATUS_CHOICES = [
+        ('active', 'Активен'),
+        ('repair', 'В ремонте'),
+        ('replaced', 'Заменен временно'),
+    ]
+    
     asset_number = models.CharField(max_length=100, verbose_name="Номер основного средства", default="не определен")
     model = models.CharField(max_length=100, verbose_name="Модель ИБП")
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, verbose_name="Отдел", blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', verbose_name="Статус")
+    comment = models.TextField(blank=True, null=True, verbose_name="Комментарий")
     battery_serial_number = models.CharField(max_length=100, blank=True, null=True, verbose_name="Серийный номер аккумулятора")
     battery_replaced_at = models.DateField(null=True, blank=True, verbose_name="Дата замены аккумулятора")
-    comment = models.TextField(blank=True, null=True, verbose_name="Комментарий")
-
-    class Meta:
-        verbose_name = "ИБП (бесперебойник)"
-        verbose_name_plural = "ИБП (бесперебойники)"
-
+    
+    # Временная замена
+    replacement_ups = models.OneToOneField('self', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Временная замена", related_name='replaced_by')
+    
     def __str__(self):
-        return f"ОС №{self.asset_number} - {self.model}"
+        status_emoji = {
+            'active': '✅',
+            'repair': '🔧',
+            'replaced': '🔄'
+        }
+        return f"{status_emoji.get(self.status, '')} ОС №{self.asset_number} - {self.model}"
+
+class BatteryHistory(models.Model):
+    """История замены аккумуляторов"""
+    ups = models.ForeignKey(UPS, on_delete=models.CASCADE, verbose_name="ИБП", related_name='battery_history')
+    old_battery_serial = models.CharField(max_length=100, verbose_name="Извлеченный аккумулятор (серийный номер)", blank=True, null=True)
+    new_battery_serial = models.CharField(max_length=100, verbose_name="Установленный аккумулятор (серийный номер)")
+    replaced_at = models.DateField(auto_now_add=True, verbose_name="Дата замены")
+    comment = models.TextField(blank=True, null=True, verbose_name="Комментарий к замене")
+    performed_by = models.CharField(max_length=150, verbose_name="Кто выполнил замену", blank=True, null=True)
+    
+    class Meta:
+        verbose_name = "История замены АКБ"
+        verbose_name_plural = "История замены АКБ"
+        ordering = ['-replaced_at']
+    
+    def __str__(self):
+        return f"{self.ups} - замена АКБ от {self.replaced_at}"
