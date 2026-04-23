@@ -3,7 +3,7 @@
     <h1>📌 Рабочие места</h1>
     <p class="note">У одного сотрудника может быть несколько рабочих мест</p>
 
-    <!-- Форма создания рабочего места (без изменений) -->
+    <!-- Форма создания рабочего места -->
     <div class="form-card">
       <h3>➕ Создать рабочее место</h3>
       
@@ -139,7 +139,6 @@
         </div>
         <div v-if="selectedComputer" class="selected-tag">
           ОС №{{ selectedComputer.asset_number }} - {{ selectedComputer.system_unit || 'системный блок не указан' }}
-          <button @click="openComputerDetails" class="details-btn" title="Детализация">📋</button>
           <button @click="selectedComputer = null" class="remove-btn">×</button>
         </div>
       </div>
@@ -165,7 +164,6 @@
         <div v-for="wp in paginatedWorkplaces" :key="wp.id" class="card">
           <div class="card-header">
             <div class="employee-info">
-              <!-- Пользователь теперь кликабельный - передаем ID сотрудника -->
               <div class="clickable-employee" @click="openEmployeeEditModal(wp.employee)">
                 <strong>{{ wp.employee_name }}</strong>
                 <span class="edit-hint-small">✏️</span>
@@ -185,36 +183,63 @@
             </div>
             
             <!-- МФУ -->
-            <div class="info-row clickable" @click="openEditModal(wp, 'mfp')">
+            <div class="info-row">
               <span class="label">🖨️ МФУ:</span>
-              <span class="value">{{ wp.mfp_detail?.model || 'Не указан' }}</span>
-              <span class="edit-hint">✏️</span>
+              <div class="flex-row">
+                <div class="clickable-value" @click="openMFPEditModal(wp)">
+                  <span class="value">{{ wp.mfp_detail?.model || 'Не указан' }}</span>
+                  <span class="edit-hint">✏️</span>
+                </div>
+              </div>
             </div>
             
             <!-- ИБП -->
-            <div class="info-row clickable" @click="openEditModal(wp, 'ups')">
+            <div class="info-row">
               <span class="label">🔋 ИБП:</span>
-              <span class="value">
-                {{ wp.ups_detail?.model || 'Не указан' }}
-                <span v-if="wp.ups_detail?.battery_replaced_at" class="battery-date">
-                  (АКБ заменён: {{ formatDate(wp.ups_detail.battery_replaced_at) }})
-                </span>
-              </span>
-              <span class="edit-hint">✏️</span>
+              <div class="flex-row">
+                <div class="clickable-value" @click="openEditModal(wp, 'ups')">
+                  <span class="value">
+                    {{ wp.ups_detail?.model || 'Не указан' }}
+                    <span v-if="wp.ups_detail?.battery_replaced_at" class="battery-date">
+                      (АКБ заменён: {{ formatDate(wp.ups_detail.battery_replaced_at) }})
+                    </span>
+                  </span>
+                  <span class="edit-hint">✏️</span>
+                </div>
+                <button 
+                  v-if="wp.ups_detail" 
+                  @click="openUPSServiceModal(wp.ups_detail)" 
+                  class="service-btn" 
+                  title="Обслуживание ИБП"
+                >
+                  🔧
+                </button>
+              </div>
             </div>
             
             <!-- Компьютер -->
-            <div class="info-row clickable" @click="openEditModal(wp, 'computer')">
+            <div class="info-row">
               <span class="label">🖥️ Компьютер:</span>
-              <span class="value">
-                <span v-if="wp.computer_detail">
-                  ОС №{{ wp.computer_detail.asset_number }}
-                  <span v-if="wp.computer_detail.computer_type">({{ getComputerTypeText(wp.computer_detail.computer_type) }})</span>
-                </span>
-                <span v-else class="no-data">Не указан</span>
-              </span>
-              <button v-if="wp.computer_detail" @click.stop="openComputerDetailsModal(wp.computer_detail)" class="details-small-btn" title="Детализация компьютера">📋</button>
-              <span class="edit-hint">✏️</span>
+              <div class="flex-row">
+                <div class="clickable-value" @click="openEditModal(wp, 'computer')">
+                  <span class="value">
+                    <span v-if="wp.computer_detail">
+                      ОС №{{ wp.computer_detail.asset_number }}
+                      <span v-if="wp.computer_detail.computer_type">({{ getComputerTypeText(wp.computer_detail.computer_type) }})</span>
+                    </span>
+                    <span v-else class="no-data">Не указан</span>
+                  </span>
+                  <span class="edit-hint">✏️</span>
+                </div>
+                <button 
+                  v-if="wp.computer_detail" 
+                  @click.stop="openComputerDetailsModal(wp.computer_detail)" 
+                  class="details-btn" 
+                  title="Детализация компьютера"
+                >
+                  📋
+                </button>
+              </div>
             </div>
             
             <!-- Комментарий ИБП -->
@@ -249,7 +274,7 @@
       </div>
     </div>
 
-    <!-- Модальное окно редактирования пользователя -->
+    <!-- Модальное окно редактирования сотрудника -->
     <div v-if="showEmployeeEditModal" class="modal">
       <div class="modal-content modal-large">
         <h3>✏️ Редактировать сотрудника</h3>
@@ -305,13 +330,68 @@
       </div>
     </div>
 
-    <!-- Модальное окно редактирования (город, МФУ, ИБП, компьютер, статус) -->
+    <!-- Модальное окно редактирования МФУ -->
+    <div v-if="showMFPEditModal" class="modal">
+      <div class="modal-content modal-large">
+        <h3>✏️ Редактировать МФУ</h3>
+        <p class="modal-subtitle">Текущее МФУ: <strong>{{ editMFPData?.model || 'Не указано' }}</strong></p>
+        
+        <div class="form-group">
+          <label>Номер основного средства:</label>
+          <input v-model="editMFPData.asset_number" class="main-field">
+        </div>
+        
+        <div class="form-group">
+          <label>Модель МФУ:</label>
+          <div class="search-wrapper">
+            <input 
+              type="text" 
+              v-model="editMFPModelSearch" 
+              @input="searchEditMFPModels" 
+              @focus="searchEditMFPModels"
+              placeholder="Поиск модели МФУ..."
+              class="search-input"
+            >
+            <div v-if="editMFPModelSearchResults.length" class="search-results">
+              <div 
+                v-for="m in editMFPModelSearchResults" 
+                :key="m.id" 
+                @click="selectEditMFPModel(m)"
+                class="search-result-item"
+              >
+                {{ m.model }}
+              </div>
+            </div>
+          </div>
+          <div v-if="editMFPSelectedModel" class="selected-tag">
+            {{ editMFPSelectedModel.model }}
+            <button @click="editMFPSelectedModel = null" class="remove-btn">×</button>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>IP адрес:</label>
+          <input 
+            v-model="editMFPData.ip_address" 
+            placeholder="192.168.1.100"
+            class="search-input ip-input"
+          >
+          <small class="field-hint">Формат: XXX.XXX.XXX.XXX (например: 10.10.29.25)</small>
+        </div>
+        
+        <div class="modal-buttons">
+          <button @click="updateMFP" class="save-btn">💾 Сохранить</button>
+          <button @click="showMFPEditModal = false" class="cancel-btn">Отмена</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно редактирования рабочего места -->
     <div v-if="showEditModal" class="modal">
       <div class="modal-content modal-large">
         <h3>✏️ Редактировать рабочее место</h3>
         <p class="modal-subtitle">Сотрудник: <strong>{{ editWorkplace.employee_name }}</strong></p>
         
-        <!-- Город -->
         <div v-if="editField === 'city'">
           <div class="form-group">
             <label>Город:</label>
@@ -324,38 +404,6 @@
           </div>
         </div>
         
-        <!-- МФУ -->
-        <div v-if="editField === 'mfp'">
-          <div class="form-group">
-            <label>МФУ:</label>
-            <div class="search-wrapper">
-              <input 
-                type="text" 
-                v-model="editMFPSearch" 
-                @input="searchEditMFP" 
-                @focus="searchEditMFP"
-                placeholder="Поиск МФУ..."
-                class="search-input"
-              >
-              <div v-if="editMFPSearchResults.length" class="search-results">
-                <div 
-                  v-for="mfp in editMFPSearchResults" 
-                  :key="mfp.id" 
-                  @click="selectEditMFP(mfp)"
-                  class="search-result-item"
-                >
-                  ОС №{{ mfp.asset_number }} - {{ mfp.model }}
-                </div>
-              </div>
-            </div>
-            <div v-if="editSelectedMFP" class="selected-tag">
-              ОС №{{ editSelectedMFP.asset_number }} - {{ editSelectedMFP.model }}
-              <button @click="editSelectedMFP = null" class="remove-btn">×</button>
-            </div>
-          </div>
-        </div>
-        
-        <!-- ИБП -->
         <div v-if="editField === 'ups'">
           <div class="form-group">
             <label>ИБП:</label>
@@ -389,7 +437,6 @@
           </div>
         </div>
         
-        <!-- Компьютер -->
         <div v-if="editField === 'computer'">
           <div class="form-group">
             <label>Компьютер:</label>
@@ -420,7 +467,6 @@
           </div>
         </div>
         
-        <!-- Статус -->
         <div v-if="editField === 'status'">
           <div class="form-group">
             <label>Статус:</label>
@@ -479,14 +525,66 @@
               {{ getServiceStatusText(computerDetails?.service_status) }}
             </span>
           </div>
-          <div v-if="computerDetails?.needs_upgrade" class="detail-row warning-row">
-            <span class="detail-label">⚠️ Модернизация:</span>
-            <span class="detail-value">Требуется модернизация</span>
-          </div>
         </div>
         
         <div class="modal-buttons">
           <button @click="showComputerDetailsModal = false" class="cancel-btn">Закрыть</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно обслуживания ИБП -->
+    <div v-if="showUPSServiceModal" class="modal">
+      <div class="modal-content modal-large">
+        <h3>🔧 Обслуживание ИБП</h3>
+        <p class="modal-subtitle">ИБП: <strong>ОС №{{ selectedUPSForService?.asset_number }} - {{ selectedUPSForService?.model }}</strong></p>
+        
+        <div class="service-form">
+          <h4>➕ Замена аккумулятора</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Извлеченный АКБ:</label>
+              <input v-model="newBattery.old_battery_serial" placeholder="Серийный номер извлеченного АКБ" class="search-input">
+            </div>
+            <div class="form-group">
+              <label>Установленный АКБ:</label>
+              <input v-model="newBattery.new_battery_serial" placeholder="Серийный номер нового АКБ" class="search-input" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Кто выполнил замену:</label>
+            <input v-model="newBattery.performed_by" placeholder="ФИО сотрудника" class="search-input">
+          </div>
+          <div class="form-group">
+            <label>Комментарий:</label>
+            <textarea v-model="newBattery.comment" placeholder="Дополнительная информация о замене..." rows="2" class="textarea-field"></textarea>
+          </div>
+          <button @click="addUPSBatteryHistory" class="submit-btn small">💾 Добавить запись</button>
+        </div>
+        
+        <div class="history-section">
+          <h4>📋 История замен аккумуляторов</h4>
+          <div v-if="upsBatteryHistory.length" class="history-list">
+            <div v-for="record in upsBatteryHistory" :key="record.id" class="history-item">
+              <div class="history-header">
+                <span class="history-date">{{ formatDate(record.replaced_at) }}</span>
+                <button @click="deleteUPSBatteryHistory(record.id)" class="delete-small" title="Удалить запись">🗑️</button>
+              </div>
+              <div class="history-details">
+                <div>📤 Извлечен: <strong>{{ record.old_battery_serial || 'не указан' }}</strong></div>
+                <div>📥 Установлен: <strong>{{ record.new_battery_serial }}</strong></div>
+                <div v-if="record.performed_by">👤 Кто: {{ record.performed_by }}</div>
+                <div v-if="record.comment">💬 {{ record.comment }}</div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="no-data">
+            <p>😕 История замен отсутствует</p>
+          </div>
+        </div>
+        
+        <div class="modal-buttons">
+          <button @click="closeUPSServiceModal" class="cancel-btn">Закрыть</button>
         </div>
       </div>
     </div>
@@ -546,6 +644,8 @@ const form = ref({
 const showEditModal = ref(false)
 const showEmployeeEditModal = ref(false)
 const showComputerDetailsModal = ref(false)
+const showUPSServiceModal = ref(false)
+const showMFPEditModal = ref(false)
 
 // Данные для редактирования рабочего места
 const editWorkplace = ref({
@@ -559,14 +659,22 @@ const editWorkplace = ref({
 })
 const editField = ref('')
 const editCityValue = ref(null)
-const editSelectedMFP = ref(null)
 const editSelectedUPS = ref(null)
 const editSelectedComputer = ref(null)
 const editStatusValue = ref('active')
 
+// Данные для редактирования МФУ
+const editMFPData = ref({
+  id: null,
+  asset_number: '',
+  model: '',
+  ip_address: ''
+})
+const editMFPModelSearch = ref('')
+const editMFPModelSearchResults = ref([])
+const editMFPSelectedModel = ref(null)
+
 // Поиск для модальных окон
-const editMFPSearch = ref('')
-const editMFPSearchResults = ref([])
 const editUPSSearch = ref('')
 const editUPSSearchResults = ref([])
 const editComputerSearch = ref('')
@@ -583,6 +691,16 @@ const editEmployee = ref({
 const editEmployeeDepartmentSearch = ref('')
 const editEmployeeDepartmentSearchResults = ref([])
 const editEmployeeSelectedDepartment = ref(null)
+
+// Данные для обслуживания ИБП
+const selectedUPSForService = ref(null)
+const upsBatteryHistory = ref([])
+const newBattery = ref({
+  old_battery_serial: '',
+  new_battery_serial: '',
+  performed_by: '',
+  comment: ''
+})
 
 // Детали компьютера
 const computerDetails = ref(null)
@@ -604,6 +722,19 @@ const totalPages = computed(() => {
 const formatDate = (date) => {
   if (!date) return ''
   return new Date(date).toLocaleDateString('ru-RU')
+}
+
+// Валидация IP
+const isValidIP = (ip) => {
+  if (!ip) return true
+  const ipRegex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/
+  if (!ipRegex.test(ip)) return false
+  const parts = ip.split('.')
+  for (let part of parts) {
+    const num = parseInt(part, 10)
+    if (isNaN(num) || num < 0 || num > 255) return false
+  }
+  return true
 }
 
 // Статусы
@@ -637,6 +768,7 @@ const getComputerTypeText = (type) => {
   return texts[type] || 'Не указан'
 }
 
+// Статусы обслуживания компьютера
 const getServiceStatusText = (status) => {
   const statusMap = {
     'operational': 'В эксплуатации',
@@ -690,6 +822,193 @@ const fetchData = async () => {
   } catch (error) {
     console.error('Ошибка загрузки:', error)
     showError('Ошибка загрузки данных: ' + (error.response?.data?.detail || error.message))
+  }
+}
+
+// Загрузка истории замен для ИБП
+const fetchUPSBatteryHistory = async (upsId) => {
+  try {
+    const response = await axios.get(`${API}/battery-history/?ups=${upsId}`)
+    upsBatteryHistory.value = response.data
+  } catch (error) {
+    console.error('Ошибка загрузки истории:', error)
+    showError('Ошибка загрузки истории замен')
+  }
+}
+
+// Открытие модального окна редактирования МФУ
+const openMFPEditModal = (workplace) => {
+  editWorkplace.value = {
+    id: workplace.id,
+    employee_name: workplace.employee_name
+  }
+  
+  if (workplace.mfp_detail) {
+    editMFPData.value = {
+      id: workplace.mfp_detail.id,
+      asset_number: workplace.mfp_detail.asset_number,
+      model: workplace.mfp_detail.model,
+      ip_address: workplace.mfp_detail.ip_address || ''
+    }
+    editMFPSelectedModel.value = { id: workplace.mfp_detail.id, model: workplace.mfp_detail.model }
+  } else {
+    editMFPData.value = {
+      id: null,
+      asset_number: '',
+      model: '',
+      ip_address: ''
+    }
+    editMFPSelectedModel.value = null
+  }
+  editMFPModelSearch.value = ''
+  editMFPModelSearchResults.value = []
+  showMFPEditModal.value = true
+}
+
+// Поиск моделей МФУ для редактирования
+const searchEditMFPModels = () => {
+  if (!editMFPModelSearch.value) {
+    editMFPModelSearchResults.value = []
+    return
+  }
+  const uniqueModels = []
+  const modelMap = new Map()
+  allMFPs.value.forEach(mfp => {
+    if (!modelMap.has(mfp.model)) {
+      modelMap.set(mfp.model, { id: mfp.id, model: mfp.model })
+      uniqueModels.push({ id: mfp.id, model: mfp.model })
+    }
+  })
+  editMFPModelSearchResults.value = uniqueModels.filter(m => 
+    m.model.toLowerCase().includes(editMFPModelSearch.value.toLowerCase())
+  ).slice(0, 10)
+}
+
+const selectEditMFPModel = (model) => {
+  editMFPSelectedModel.value = model
+  editMFPData.value.model = model.model
+  editMFPModelSearch.value = ''
+  editMFPModelSearchResults.value = []
+}
+
+// Обновление МФУ
+const updateMFP = async () => {
+  if (!editMFPData.value.model) {
+    showWarning('Пожалуйста, укажите модель МФУ')
+    return
+  }
+  
+  if (editMFPData.value.ip_address && !isValidIP(editMFPData.value.ip_address)) {
+    showWarning('Пожалуйста, введите корректный IP адрес (формат: 192.168.1.100)')
+    return
+  }
+  
+  try {
+    let mfpId = editMFPData.value.id
+    
+    if (!mfpId) {
+      const newMFPData = {
+        asset_number: editMFPData.value.asset_number || 'не определен',
+        model: editMFPData.value.model,
+        ip_address: editMFPData.value.ip_address || null
+      }
+      const response = await axios.post(`${API}/mfps/`, newMFPData)
+      mfpId = response.data.id
+    } else {
+      const updateData = {
+        asset_number: editMFPData.value.asset_number,
+        model: editMFPData.value.model,
+        ip_address: editMFPData.value.ip_address || null
+      }
+      await axios.put(`${API}/mfps/${mfpId}/`, updateData)
+    }
+    
+    await axios.patch(`${API}/workplaces/${editWorkplace.value.id}/`, {
+      mfp: mfpId
+    })
+    
+    showMFPEditModal.value = false
+    await fetchData()
+    showSuccess('МФУ успешно обновлено!')
+  } catch (error) {
+    console.error('Ошибка обновления МФУ:', error)
+    showError('Ошибка обновления МФУ: ' + (error.response?.data?.detail || error.message))
+  }
+}
+
+// Открытие модального окна обслуживания ИБП
+const openUPSServiceModal = async (ups) => {
+  selectedUPSForService.value = ups
+  await fetchUPSBatteryHistory(ups.id)
+  newBattery.value = {
+    old_battery_serial: '',
+    new_battery_serial: '',
+    performed_by: '',
+    comment: ''
+  }
+  showUPSServiceModal.value = true
+}
+
+// Закрытие модального окна обслуживания ИБП
+const closeUPSServiceModal = () => {
+  showUPSServiceModal.value = false
+  selectedUPSForService.value = null
+  upsBatteryHistory.value = []
+}
+
+// Добавление записи о замене АКБ
+const addUPSBatteryHistory = async () => {
+  if (!newBattery.value.new_battery_serial) {
+    showWarning('Пожалуйста, укажите серийный номер установленного аккумулятора')
+    return
+  }
+  
+  try {
+    const historyData = {
+      ups: selectedUPSForService.value.id,
+      old_battery_serial: newBattery.value.old_battery_serial || null,
+      new_battery_serial: newBattery.value.new_battery_serial,
+      performed_by: newBattery.value.performed_by || null,
+      comment: newBattery.value.comment || null
+    }
+    
+    await axios.post(`${API}/battery-history/`, historyData)
+    await fetchUPSBatteryHistory(selectedUPSForService.value.id)
+    await fetchData()
+    
+    newBattery.value = {
+      old_battery_serial: '',
+      new_battery_serial: '',
+      performed_by: '',
+      comment: ''
+    }
+    
+    showSuccess('Замена аккумулятора зафиксирована!')
+  } catch (error) {
+    console.error('Ошибка добавления записи:', error)
+    showError('Ошибка добавления записи о замене')
+  }
+}
+
+// Удаление записи об обслуживании
+const deleteUPSBatteryHistory = async (id) => {
+  const confirmed = await confirmModal.value.open({
+    title: 'Удаление записи',
+    message: 'Вы уверены, что хотите удалить эту запись о замене аккумулятора?',
+    confirmText: 'Да, удалить',
+    type: 'danger'
+  })
+  
+  if (confirmed) {
+    try {
+      await axios.delete(`${API}/battery-history/${id}/`)
+      await fetchUPSBatteryHistory(selectedUPSForService.value.id)
+      await fetchData()
+      showSuccess('Запись удалена!')
+    } catch (error) {
+      console.error('Ошибка удаления:', error)
+      showError('Ошибка удаления записи')
+    }
   }
 }
 
@@ -809,23 +1128,6 @@ const createWorkplace = async () => {
 }
 
 // Поиск для модальных окон
-const searchEditMFP = () => {
-  if (!editMFPSearch.value) {
-    editMFPSearchResults.value = []
-    return
-  }
-  editMFPSearchResults.value = allMFPs.value.filter(mfp => 
-    mfp.asset_number.toLowerCase().includes(editMFPSearch.value.toLowerCase()) ||
-    mfp.model.toLowerCase().includes(editMFPSearch.value.toLowerCase())
-  ).slice(0, 10)
-}
-
-const selectEditMFP = (mfp) => {
-  editSelectedMFP.value = mfp
-  editMFPSearch.value = ''
-  editMFPSearchResults.value = []
-}
-
 const searchEditUPS = () => {
   if (!editUPSSearch.value) {
     editUPSSearchResults.value = []
@@ -891,12 +1193,9 @@ const openEditModal = (workplace, field) => {
   }
   editField.value = field
   editCityValue.value = workplace.city
-  editSelectedMFP.value = workplace.mfp_detail
   editSelectedUPS.value = workplace.ups_detail
   editSelectedComputer.value = workplace.computer_detail
   editStatusValue.value = workplace.status
-  editMFPSearch.value = ''
-  editMFPSearchResults.value = []
   editUPSSearch.value = ''
   editUPSSearchResults.value = []
   editComputerSearch.value = ''
@@ -908,7 +1207,6 @@ const openEditModal = (workplace, field) => {
 const closeEditModal = () => {
   showEditModal.value = false
   editField.value = ''
-  editSelectedMFP.value = null
   editSelectedUPS.value = null
   editSelectedComputer.value = null
 }
@@ -952,9 +1250,6 @@ const updateWorkplaceField = async () => {
     switch (editField.value) {
       case 'city':
         updateData = { city: editCityValue.value }
-        break
-      case 'mfp':
-        updateData = { mfp: editSelectedMFP.value?.id || null }
         break
       case 'ups':
         updateData = { ups: editSelectedUPS.value?.id || null }
@@ -1045,122 +1340,6 @@ onMounted(fetchData)
 
 <style scoped>
 /* Все стили остаются как в предыдущей версии */
-.clickable-employee {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  padding: 4px 8px;
-  margin: -4px -8px;
-  border-radius: 8px;
-  transition: all 0.2s;
-}
-
-.clickable-employee:hover {
-  background: rgba(26, 188, 156, 0.15);
-}
-
-.edit-hint-small {
-  opacity: 0;
-  font-size: 0.7rem;
-  color: #1abc9c;
-  transition: opacity 0.2s;
-}
-
-.clickable-employee:hover .edit-hint-small {
-  opacity: 1;
-}
-
-.details-btn {
-  background: none;
-  border: none;
-  font-size: 1rem;
-  cursor: pointer;
-  padding: 0 5px;
-  color: #3498db;
-  transition: all 0.2s;
-}
-
-.details-btn:hover {
-  color: #2980b9;
-  transform: scale(1.1);
-}
-
-.details-small-btn {
-  background: none;
-  border: none;
-  font-size: 0.85rem;
-  cursor: pointer;
-  padding: 2px 5px;
-  margin-left: 5px;
-  color: #3498db;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.details-small-btn:hover {
-  background: #3498db;
-  color: white;
-}
-
-.service-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 0.7rem;
-  font-weight: 500;
-}
-
-.status-operational {
-  background: #d4edda;
-  color: #155724;
-}
-
-.status-repair {
-  background: #f8d7da;
-  color: #721c24;
-}
-
-.status-upgrade {
-  background: #fff3cd;
-  color: #856404;
-}
-
-.computer-details {
-  margin-top: 1rem;
-}
-
-.detail-row {
-  display: flex;
-  align-items: flex-start;
-  margin-bottom: 12px;
-  padding: 8px;
-  border-bottom: 1px solid #eee;
-}
-
-.detail-label {
-  font-weight: 600;
-  color: #555;
-  min-width: 120px;
-  flex-shrink: 0;
-}
-
-.detail-value {
-  color: #333;
-  flex: 1;
-}
-
-.warning-row {
-  background: #fff3cd;
-  border-radius: 6px;
-}
-
-.warning-row .detail-label,
-.warning-row .detail-value {
-  color: #856404;
-}
-
-/* Остальные стили из предыдущей версии */
 .page {
   max-width: 1400px;
   margin: 0 auto;
@@ -1408,9 +1587,7 @@ h1 {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  padding: 6px 8px;
-  border-radius: 8px;
-  transition: all 0.2s;
+  padding: 4px 0;
 }
 
 .info-row.clickable {
@@ -1418,7 +1595,8 @@ h1 {
 }
 
 .info-row.clickable:hover {
-  background: rgba(26, 188, 156, 0.1);
+  background: rgba(26, 188, 156, 0.05);
+  border-radius: 8px;
 }
 
 .label {
@@ -1433,6 +1611,40 @@ h1 {
   flex: 1;
 }
 
+.flex-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.clickable-value {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 4px 8px;
+  margin: -4px -8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.clickable-value:hover {
+  background: rgba(26, 188, 156, 0.1);
+}
+
+.clickable-value .edit-hint {
+  opacity: 0;
+  margin-left: 8px;
+  font-size: 0.7rem;
+  color: #1abc9c;
+  transition: opacity 0.2s;
+}
+
+.clickable-value:hover .edit-hint {
+  opacity: 1;
+}
+
 .edit-hint {
   opacity: 0;
   margin-left: 8px;
@@ -1445,9 +1657,39 @@ h1 {
   opacity: 1;
 }
 
+.service-btn, .details-btn {
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.service-btn {
+  color: #f39c12;
+}
+
+.service-btn:hover {
+  background: #f39c12;
+  color: white;
+}
+
+.details-btn {
+  color: #3498db;
+}
+
+.details-btn:hover {
+  background: #3498db;
+  color: white;
+}
+
 .comment-row {
   background: #fef5e7;
   border-left: 3px solid #f39c12;
+  padding: 6px 10px;
+  border-radius: 8px;
 }
 
 .value.comment {
@@ -1534,6 +1776,7 @@ h1 {
   font-size: 0.9rem;
 }
 
+/* Модальные окна */
 .modal {
   position: fixed;
   top: 0;
@@ -1552,7 +1795,7 @@ h1 {
   padding: 2rem;
   border-radius: 16px;
   width: 90%;
-  max-width: 500px;
+  max-width: 600px;
   box-shadow: 0 10px 40px rgba(0,0,0,0.2);
 }
 
@@ -1571,15 +1814,6 @@ h1 {
   font-size: 0.9rem;
 }
 
-.modal-content input, .modal-content select {
-  width: 100%;
-  margin-bottom: 1rem;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 1rem;
-}
-
 .modal-buttons {
   display: flex;
   gap: 1rem;
@@ -1594,7 +1828,6 @@ h1 {
   padding: 10px 20px;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 0.95rem;
 }
 
 .save-btn:hover {
@@ -1608,14 +1841,200 @@ h1 {
   padding: 10px 20px;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 0.95rem;
 }
 
 .cancel-btn:hover {
   background: #c0392b;
 }
 
+/* Стили для обслуживания ИБП */
+.service-form {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.service-form h4 {
+  margin-bottom: 1rem;
+  color: #2c3e50;
+}
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.form-row .form-group {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.textarea-field {
+  width: 100%;
+  padding: 12px 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-family: inherit;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.textarea-field:focus {
+  outline: none;
+  border-color: #1abc9c;
+  box-shadow: 0 0 0 3px rgba(26, 188, 156, 0.1);
+}
+
+.history-section {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.history-section h4 {
+  margin-bottom: 1rem;
+  color: #2c3e50;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.history-item {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 10px;
+  border-left: 3px solid #1abc9c;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #eee;
+}
+
+.history-date {
+  font-weight: 600;
+  color: #1abc9c;
+  font-size: 0.8rem;
+}
+
+.delete-small {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #e74c3c;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.delete-small:hover {
+  background: #e74c3c;
+  color: white;
+}
+
+.history-details {
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.history-details div {
+  margin-bottom: 4px;
+}
+
+/* Детали компьютера */
+.computer-details {
+  margin-top: 1rem;
+}
+
+.detail-row {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.detail-label {
+  font-weight: 600;
+  color: #555;
+  min-width: 120px;
+  flex-shrink: 0;
+}
+
+.detail-value {
+  color: #333;
+  flex: 1;
+}
+
+.service-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.status-operational {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-repair {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.status-upgrade {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.ip-input {
+  font-family: 'Courier New', monospace;
+  font-size: 1rem;
+  letter-spacing: 0.5px;
+}
+
+.field-hint {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.75rem;
+  color: #999;
+}
+
+.main-field {
+  width: 100%;
+  padding: 12px 15px;
+  border: 2px solid #1abc9c;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  background: #f8f9fa;
+  transition: all 0.2s;
+}
+
+.main-field:focus {
+  outline: none;
+  background: white;
+  border-color: #16a085;
+  box-shadow: 0 0 0 3px rgba(26, 188, 156, 0.1);
+}
+
 @media (max-width: 768px) {
+  .cards-grid {
+    grid-template-columns: 1fr;
+  }
+  
   .modal-content {
     padding: 1.5rem;
     margin: 1rem;
@@ -1630,12 +2049,16 @@ h1 {
     margin-bottom: 4px;
   }
   
-  .detail-row {
+  .form-row {
     flex-direction: column;
   }
   
-  .detail-label {
-    margin-bottom: 4px;
+  .form-row .form-group {
+    margin-bottom: 1rem;
+  }
+  
+  .flex-row {
+    flex-wrap: wrap;
   }
 }
 </style>

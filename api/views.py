@@ -84,25 +84,31 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
             'locations': []
         }
         
-        # Поиск сотрудников - делаем поиск без учета регистра
-        employees = Employee.objects.filter(
-            Q(last_name__icontains=query) |
-            Q(first_name__icontains=query) |
-            Q(patronymic__icontains=query)
-        )
+        # Приводим поисковый запрос к нижнему регистру
+        query_lower = query.lower()
         
-        print(f"📊 Найдено сотрудников: {employees.count()}")
+        # Разбиваем запрос на отдельные слова для более точного поиска
+        query_words = query_lower.split()
+        print(f"🔍 Ключевые слова: {query_words}")
         
-        # Для отладки выведем всех сотрудников в базе
+        # Поиск сотрудников
         all_employees = Employee.objects.all()
-        print(f"📋 Всего сотрудников в базе: {all_employees.count()}")
-        for emp in all_employees:
-            print(f"   - {emp.last_name} {emp.first_name} {emp.patronymic or ''}")
+        employees_found = []
         
-        for emp in employees:
-            print(f"✅ Обработка сотрудника: {emp.last_name} {emp.first_name}")
+        for emp in all_employees:
+            # Создаем строку для поиска (фамилия + имя + отчество)
+            searchable = f"{emp.last_name} {emp.first_name} {emp.patronymic or ''}".lower()
             
-            # Находим рабочее место сотрудника
+            # Проверяем, содержит ли строка все ключевые слова
+            match = all(word in searchable for word in query_words)
+            
+            if match:
+                employees_found.append(emp)
+                print(f"✅ Найден сотрудник: {emp.last_name} {emp.first_name}")
+        
+        print(f"📊 Найдено сотрудников: {len(employees_found)}")
+        
+        for emp in employees_found:
             workplace = Workplace.objects.filter(employee=emp).first()
             computer = None
             ups = None
@@ -113,7 +119,6 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
                 ups = workplace.ups
                 mfp = workplace.mfp
             
-            # История замен аккумулятора для ИБП
             battery_history = []
             if ups:
                 battery_history = BatteryHistory.objects.filter(ups=ups).order_by('-replaced_at')
@@ -166,160 +171,291 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
             })
         
         # Поиск рабочих мест
-        workplaces = Workplace.objects.filter(
-            Q(employee__last_name__icontains=query) |
-            Q(employee__first_name__icontains=query) |
-            Q(location__icontains=query) |
-            Q(city__name__icontains=query)
-        )
-        
-        for wp in workplaces:
-            results['workplaces'].append({
-                'id': wp.id,
-                'employee_name': wp.employee.full_name,
-                'location': wp.location,
-                'city': wp.city.name if wp.city else None,
-                'status': wp.status,
-                'created_at': wp.created_at,
-                'computer': {
-                    'asset_number': wp.computer.asset_number if wp.computer else None,
-                    'system_unit': wp.computer.system_unit if wp.computer else None
-                } if wp.computer else None,
-                'mfp': {
-                    'model': wp.mfp.model if wp.mfp else None,
-                    'ip_address': wp.mfp.ip_address if wp.mfp else None
-                } if wp.mfp else None,
-                'ups': {
-                    'model': wp.ups.model if wp.ups else None,
-                    'battery_replaced_at': wp.ups.battery_replaced_at if wp.ups else None
-                } if wp.ups else None
-            })
+        all_workplaces = Workplace.objects.all()
+        for wp in all_workplaces:
+            searchable = f"{wp.employee.last_name} {wp.employee.first_name} {wp.location or ''} {wp.city.name if wp.city else ''}".lower()
+            match = all(word in searchable for word in query_words)
+            
+            if match:
+                results['workplaces'].append({
+                    'id': wp.id,
+                    'employee_name': wp.employee.full_name,
+                    'location': wp.location,
+                    'city': wp.city.name if wp.city else None,
+                    'status': wp.status,
+                    'created_at': wp.created_at,
+                    'computer': {
+                        'asset_number': wp.computer.asset_number if wp.computer else None,
+                        'system_unit': wp.computer.system_unit if wp.computer else None
+                    } if wp.computer else None,
+                    'mfp': {
+                        'model': wp.mfp.model if wp.mfp else None,
+                        'ip_address': wp.mfp.ip_address if wp.mfp else None
+                    } if wp.mfp else None,
+                    'ups': {
+                        'model': wp.ups.model if wp.ups else None,
+                        'battery_replaced_at': wp.ups.battery_replaced_at if wp.ups else None
+                    } if wp.ups else None
+                })
         
         # Поиск компьютеров
-        computers = Computer.objects.filter(
-            Q(asset_number__icontains=query) |
-            Q(system_unit__icontains=query)
-        )
-        
-        for comp in computers:
-            workplace = Workplace.objects.filter(computer=comp).first()
+        all_computers = Computer.objects.all()
+        for comp in all_computers:
+            searchable = f"{comp.asset_number} {comp.system_unit or ''}".lower()
+            match = all(word in searchable for word in query_words)
             
-            results['computers'].append({
-                'id': comp.id,
-                'asset_number': comp.asset_number,
-                'system_unit': comp.system_unit,
-                'computer_type': comp.computer_type,
-                'has_keyboard': comp.has_keyboard,
-                'has_mouse': comp.has_mouse,
-                'service_status': comp.service_status,
-                'needs_upgrade': comp.needs_upgrade,
-                'monitors': [{'brand': m.brand} for m in comp.monitors.all()],
-                'assigned_to': {
-                    'id': workplace.employee.id if workplace else None,
-                    'full_name': workplace.employee.full_name if workplace else None
-                } if workplace else None,
-                'workplace': {
-                    'id': workplace.id if workplace else None,
-                    'city': workplace.city.name if workplace and workplace.city else None
-                } if workplace else None
-            })
+            if match:
+                workplace = Workplace.objects.filter(computer=comp).first()
+                
+                results['computers'].append({
+                    'id': comp.id,
+                    'asset_number': comp.asset_number,
+                    'system_unit': comp.system_unit,
+                    'computer_type': comp.computer_type,
+                    'has_keyboard': comp.has_keyboard,
+                    'has_mouse': comp.has_mouse,
+                    'service_status': comp.service_status,
+                    'needs_upgrade': comp.needs_upgrade,
+                    'monitors': [{'brand': m.brand} for m in comp.monitors.all()],
+                    'assigned_to': {
+                        'id': workplace.employee.id if workplace else None,
+                        'full_name': workplace.employee.full_name if workplace else None
+                    } if workplace else None,
+                    'workplace': {
+                        'id': workplace.id if workplace else None,
+                        'city': workplace.city.name if workplace and workplace.city else None
+                    } if workplace else None
+                })
         
         # Поиск МФУ
-        mfps = MFP.objects.filter(
-            Q(asset_number__icontains=query) |
-            Q(model__icontains=query) |
-            Q(ip_address__icontains=query)
-        )
-        
-        for mfp in mfps:
-            workplaces_with_mfp = Workplace.objects.filter(mfp=mfp)
-            results['mfps'].append({
-                'id': mfp.id,
-                'asset_number': mfp.asset_number,
-                'model': mfp.model,
-                'ip_address': mfp.ip_address,
-                'used_in_workplaces': [{
-                    'id': wp.id,
-                    'employee_name': wp.employee.full_name,
-                    'city': wp.city.name if wp.city else None
-                } for wp in workplaces_with_mfp]
-            })
+        all_mfps = MFP.objects.all()
+        for mfp in all_mfps:
+            searchable = f"{mfp.asset_number} {mfp.model} {mfp.ip_address or ''}".lower()
+            match = all(word in searchable for word in query_words)
+            
+            if match:
+                workplaces_with_mfp = Workplace.objects.filter(mfp=mfp)
+                results['mfps'].append({
+                    'id': mfp.id,
+                    'asset_number': mfp.asset_number,
+                    'model': mfp.model,
+                    'ip_address': mfp.ip_address,
+                    'used_in_workplaces': [{
+                        'id': wp.id,
+                        'employee_name': wp.employee.full_name,
+                        'city': wp.city.name if wp.city else None
+                    } for wp in workplaces_with_mfp]
+                })
         
         # Поиск ИБП
-        upses = UPS.objects.filter(
-            Q(asset_number__icontains=query) |
-            Q(model__icontains=query)
-        )
-        
-        for ups in upses:
-            workplaces_with_ups = Workplace.objects.filter(ups=ups)
-            battery_history = BatteryHistory.objects.filter(ups=ups).order_by('-replaced_at')
+        all_ups = UPS.objects.all()
+        for ups in all_ups:
+            searchable = f"{ups.asset_number} {ups.model} {ups.comment or ''}".lower()
+            match = all(word in searchable for word in query_words)
             
-            results['ups'].append({
-                'id': ups.id,
-                'asset_number': ups.asset_number,
-                'model': ups.model,
-                'status': ups.status,
-                'comment': ups.comment,
-                'battery_serial_number': ups.battery_serial_number,
-                'battery_replaced_at': ups.battery_replaced_at,
-                'battery_history': [{
-                    'id': bh.id,
-                    'old_battery_serial': bh.old_battery_serial,
-                    'new_battery_serial': bh.new_battery_serial,
-                    'replaced_at': bh.replaced_at,
-                    'performed_by': bh.performed_by
-                } for bh in battery_history],
-                'used_in_workplaces': [{
-                    'id': wp.id,
-                    'employee_name': wp.employee.full_name,
-                    'city': wp.city.name if wp.city else None
-                } for wp in workplaces_with_ups]
-            })
+            if match:
+                workplaces_with_ups = Workplace.objects.filter(ups=ups)
+                battery_history = BatteryHistory.objects.filter(ups=ups).order_by('-replaced_at')
+                
+                results['ups'].append({
+                    'id': ups.id,
+                    'asset_number': ups.asset_number,
+                    'model': ups.model,
+                    'status': ups.status,
+                    'comment': ups.comment,
+                    'battery_serial_number': ups.battery_serial_number,
+                    'battery_replaced_at': ups.battery_replaced_at,
+                    'battery_history': [{
+                        'id': bh.id,
+                        'old_battery_serial': bh.old_battery_serial,
+                        'new_battery_serial': bh.new_battery_serial,
+                        'replaced_at': bh.replaced_at,
+                        'performed_by': bh.performed_by
+                    } for bh in battery_history],
+                    'used_in_workplaces': [{
+                        'id': wp.id,
+                        'employee_name': wp.employee.full_name,
+                        'city': wp.city.name if wp.city else None
+                    } for wp in workplaces_with_ups]
+                })
         
         # Поиск телевизоров
-        tvs = TV.objects.filter(
-            Q(asset_number__icontains=query) |
-            Q(brand__icontains=query) |
-            Q(location__icontains=query)
-        )
-        
-        for tv in tvs:
-            results['tvs'].append({
-                'id': tv.id,
-                'asset_number': tv.asset_number,
-                'brand': tv.brand,
-                'size': tv.size,
-                'location': tv.location
-            })
+        all_tvs = TV.objects.all()
+        for tv in all_tvs:
+            searchable = f"{tv.asset_number or ''} {tv.brand} {tv.location or ''}".lower()
+            match = all(word in searchable for word in query_words)
+            
+            if match:
+                results['tvs'].append({
+                    'id': tv.id,
+                    'asset_number': tv.asset_number,
+                    'brand': tv.brand,
+                    'size': tv.size,
+                    'location': tv.location
+                })
         
         # Поиск отделов
-        departments = Department.objects.filter(name__icontains=query)
-        for dep in departments:
-            employees_in_dep = Employee.objects.filter(department=dep)
-            results['departments'].append({
-                'id': dep.id,
-                'name': dep.name,
-                'employees_count': employees_in_dep.count(),
-                'employees': [{
-                    'id': e.id,
-                    'full_name': e.full_name
-                } for e in employees_in_dep[:5]]
-            })
+        all_departments = Department.objects.all()
+        for dep in all_departments:
+            if query_lower in dep.name.lower():
+                employees_in_dep = Employee.objects.filter(department=dep)
+                results['departments'].append({
+                    'id': dep.id,
+                    'name': dep.name,
+                    'employees_count': employees_in_dep.count(),
+                    'employees': [{
+                        'id': e.id,
+                        'full_name': e.full_name
+                    } for e in employees_in_dep[:5]]
+                })
         
         # Поиск локаций
-        locations = Location.objects.filter(name__icontains=query)
-        for loc in locations:
-            workplaces_in_loc = Workplace.objects.filter(city=loc)
-            results['locations'].append({
-                'id': loc.id,
-                'name': loc.name,
-                'workplaces_count': workplaces_in_loc.count(),
-                'workplaces': [{
-                    'id': wp.id,
-                    'employee_name': wp.employee.full_name
-                } for wp in workplaces_in_loc[:5]]
-            })
+        all_locations = Location.objects.all()
+        for loc in all_locations:
+            if query_lower in loc.name.lower():
+                workplaces_in_loc = Workplace.objects.filter(city=loc)
+                results['locations'].append({
+                    'id': loc.id,
+                    'name': loc.name,
+                    'workplaces_count': workplaces_in_loc.count(),
+                    'workplaces': [{
+                        'id': wp.id,
+                        'employee_name': wp.employee.full_name
+                    } for wp in workplaces_in_loc[:5]]
+                })
         
         print(f"✅ Результатов сотрудников: {len(results['employees'])}")
         return Response(results)
+
+    @action(detail=False, methods=['get'])
+    def suggestions(self, request):
+        """Возвращает подсказки для поиска"""
+        query = request.query_params.get('q', '').strip()
+        print(f"🔍 Подсказки для: '{query}'")
+        
+        if not query:
+            return Response([])
+        
+        suggestions = []
+        
+        # Приводим поисковый запрос к нижнему регистру для сравнения
+        query_lower = query.lower()
+        
+        # Поиск сотрудников - ищем по нижнему регистру
+        employees = Employee.objects.all()
+        
+        for emp in employees:
+            # Проверяем совпадение вручную (без учета регистра)
+            if (query_lower in emp.last_name.lower() or 
+                query_lower in emp.first_name.lower() or 
+                (emp.patronymic and query_lower in emp.patronymic.lower())):
+                suggestions.append({
+                    'id': f'emp_{emp.id}',
+                    'icon': '👤',
+                    'title': emp.full_name,
+                    'subtitle': emp.department.name if emp.department else 'Отдел не указан',
+                    'type': 'Сотрудник',
+                    'searchValue': f"{emp.last_name} {emp.first_name}"
+                })
+        
+        # Ограничиваем количество
+        suggestions = suggestions[:5]
+        print(f"Найдено сотрудников для подсказок: {len(suggestions)}")
+        
+        # Поиск компьютеров
+        computers = Computer.objects.all()
+        for comp in computers:
+            if (query_lower in comp.asset_number.lower() or 
+                (comp.system_unit and query_lower in comp.system_unit.lower())):
+                suggestions.append({
+                    'id': f'comp_{comp.id}',
+                    'icon': '🖥️',
+                    'title': f"ОС №{comp.asset_number}",
+                    'subtitle': comp.system_unit or 'Системный блок не указан',
+                    'type': 'Компьютер',
+                    'searchValue': comp.asset_number
+                })
+                if len(suggestions) >= 15:
+                    break
+        
+        # Поиск МФУ
+        mfps = MFP.objects.all()
+        for mfp in mfps:
+            if (query_lower in mfp.asset_number.lower() or 
+                query_lower in mfp.model.lower()):
+                suggestions.append({
+                    'id': f'mfp_{mfp.id}',
+                    'icon': '🖨️',
+                    'title': f"ОС №{mfp.asset_number}",
+                    'subtitle': mfp.model,
+                    'type': 'МФУ',
+                    'searchValue': mfp.asset_number
+                })
+                if len(suggestions) >= 15:
+                    break
+        
+        # Поиск ИБП
+        upses = UPS.objects.all()
+        for ups in upses:
+            if (query_lower in ups.asset_number.lower() or 
+                query_lower in ups.model.lower()):
+                suggestions.append({
+                    'id': f'ups_{ups.id}',
+                    'icon': '🔋',
+                    'title': f"ОС №{ups.asset_number}",
+                    'subtitle': ups.model,
+                    'type': 'ИБП',
+                    'searchValue': ups.asset_number
+                })
+                if len(suggestions) >= 15:
+                    break
+        
+        # Поиск телевизоров
+        tvs = TV.objects.all()
+        for tv in tvs:
+            if ((tv.asset_number and query_lower in tv.asset_number.lower()) or 
+                query_lower in tv.brand.lower()):
+                suggestions.append({
+                    'id': f'tv_{tv.id}',
+                    'icon': '📺',
+                    'title': tv.brand,
+                    'subtitle': f"{tv.size}\" - {tv.asset_number or 'без номера'}",
+                    'type': 'Телевизор',
+                    'searchValue': tv.brand
+                })
+                if len(suggestions) >= 15:
+                    break
+        
+        # Поиск отделов
+        departments = Department.objects.all()
+        for dep in departments:
+            if query_lower in dep.name.lower():
+                suggestions.append({
+                    'id': f'dep_{dep.id}',
+                    'icon': '📁',
+                    'title': dep.name,
+                    'subtitle': f'Отдел',
+                    'type': 'Отдел',
+                    'searchValue': dep.name
+                })
+                if len(suggestions) >= 15:
+                    break
+        
+        # Поиск локаций
+        locations = Location.objects.all()
+        for loc in locations:
+            if query_lower in loc.name.lower():
+                suggestions.append({
+                    'id': f'loc_{loc.id}',
+                    'icon': '🏙️',
+                    'title': loc.name,
+                    'subtitle': f'Локация',
+                    'type': 'Локация',
+                    'searchValue': loc.name
+                })
+                if len(suggestions) >= 15:
+                    break
+        
+        return Response(suggestions[:15])
+        
+

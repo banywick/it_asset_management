@@ -1,14 +1,10 @@
 <template>
   <div class="page">
-    <h1>🔍 Результаты поиска</h1>
-    
-    <div class="search-info">
-      <div class="search-query">
-        <span class="query-label">Поиск:</span>
-        <span class="query-text">{{ searchQuery }}</span>
-        <button @click="clearSearch" class="clear-btn">✖️ Очистить</button>
+    <div class="search-header">
+      <h1>🔍 Глобальный поиск</h1>
+      <div class="search-stats" v-if="hasResults">
+        <span class="stat-badge">📊 Найдено: {{ totalResults }}</span>
       </div>
-      <div class="results-count">Найдено: {{ totalResults }} результатов</div>
     </div>
 
     <!-- Результаты поиска -->
@@ -18,43 +14,45 @@
     </div>
 
     <div v-else-if="!hasResults && searched" class="no-results">
-      <p>😕 Ничего не найдено по запросу "{{ searchQuery }}"</p>
+      <div class="no-results-icon">🔍</div>
+      <p>Ничего не найдено по запросу "{{ searchQuery }}"</p>
       <p class="hint">Попробуйте изменить поисковый запрос</p>
     </div>
 
     <div v-else-if="hasResults" class="results">
       <!-- Сотрудники -->
-      <div v-if="searchResults.employees && searchResults.employees.length" class="result-category">
-        <h2 class="category-title">
-          <span class="category-icon">👥</span>
-          Сотрудники ({{ searchResults.employees.length }})
-        </h2>
+      <div v-if="searchResults.employees?.length" class="result-category">
+        <div class="category-header">
+          <div class="category-title">
+            <span class="category-icon">👥</span>
+            <h2>Сотрудники</h2>
+            <span class="count">{{ searchResults.employees.length }}</span>
+          </div>
+        </div>
         <div class="cards-grid">
-          <div v-for="emp in searchResults.employees" :key="emp.id" class="result-card employee-card">
+          <div v-for="emp in searchResults.employees" :key="emp.id" class="result-card">
             <div class="card-header">
-              <strong>{{ emp.full_name || `${emp.last_name} ${emp.first_name} ${emp.patronymic || ''}` }}</strong>
-              <div class="card-actions">
-                <span class="badge">Сотрудник</span>
-                <button @click="openEditModal('employee', emp)" class="edit-btn-small" title="Редактировать">✏️</button>
+              <div class="header-icon">👤</div>
+              <div class="header-info">
+                <div class="title">{{ emp.full_name }}</div>
+                <div class="subtitle">{{ emp.department?.name || 'Отдел не указан' }}</div>
               </div>
+              <button @click="openEditModal('employee', emp)" class="edit-icon-btn" title="Редактировать">✏️</button>
             </div>
-            <div class="card-body">
-              <div class="detail-item" @click="openEditModal('employee', emp)">
-                <span class="label">📍 Отдел:</span>
-                <span class="value clickable-field">{{ emp.department?.name || 'Не указан' }}</span>
-                <span class="edit-hint">✏️</span>
-              </div>
-              
+            
+            <div class="card-content">
               <!-- Рабочее место -->
-              <div v-if="emp.workplace" class="relation-block">
-                <div class="relation-title">🏢 Рабочее место</div>
-                <div class="detail-item" @click="openEditModal('workplace', { id: emp.workplace.id, employee_name: emp.full_name })">
-                  <span class="label">Город:</span>
-                  <span class="value clickable-field">{{ emp.workplace.city || 'Не указан' }}</span>
-                  <span class="edit-hint">✏️</span>
+              <div 
+                v-if="emp.workplace" 
+                class="relation-section"
+                @click="openDetailsModal('workplace', emp.workplace.id)"
+              >
+                <div class="relation-header">
+                  <span class="relation-icon">🏢</span>
+                  <span class="relation-title">Рабочее место</span>
+                  <span class="relation-city">{{ emp.workplace.city || 'Город не указан' }}</span>
                 </div>
-                <div class="detail-item">
-                  <span class="label">Статус:</span>
+                <div class="relation-status">
                   <span :class="['status-badge', getWorkplaceStatusClass(emp.workplace.status)]">
                     {{ getWorkplaceStatusText(emp.workplace.status) }}
                   </span>
@@ -62,74 +60,233 @@
               </div>
               
               <!-- Компьютер -->
-              <div v-if="emp.computer" class="relation-block">
-                <div class="relation-title">🖥️ Закрепленный компьютер</div>
-                <div class="detail-item" @click="openEditModal('computer', { id: emp.computer.id, asset_number: emp.computer.asset_number })">
-                  <span class="label">ОС №:</span>
-                  <span class="value clickable-field">{{ emp.computer.asset_number }}</span>
-                  <span class="edit-hint">✏️</span>
+              <div 
+                v-if="emp.computer" 
+                class="relation-section"
+                @click="openDetailsModal('computer', emp.computer.id)"
+              >
+                <div class="relation-header">
+                  <span class="relation-icon">🖥️</span>
+                  <span class="relation-title">Закрепленный компьютер</span>
+                  <span class="relation-subtitle">ОС №{{ emp.computer.asset_number }}</span>
                 </div>
-                <div class="detail-item">
-                  <span class="label">Системный блок:</span>
-                  <span class="value">{{ emp.computer.system_unit || 'Не указан' }}</span>
-                </div>
-                <div class="detail-item">
-                  <span class="label">Тип:</span>
-                  <span class="value">{{ getComputerTypeText(emp.computer.computer_type) }}</span>
-                </div>
+                <div class="relation-type">{{ getComputerTypeText(emp.computer.computer_type) }}</div>
               </div>
               
               <!-- ИБП -->
-              <div v-if="emp.ups" class="relation-block">
-                <div class="relation-title">🔋 Бесперебойник</div>
-                <div class="detail-item" @click="openEditModal('ups', { id: emp.ups.id, asset_number: emp.ups.asset_number })">
-                  <span class="label">Модель:</span>
-                  <span class="value clickable-field">{{ emp.ups.model }}</span>
-                  <span class="edit-hint">✏️</span>
+              <div 
+                v-if="emp.ups" 
+                class="relation-section"
+                @click="openDetailsModal('ups', emp.ups.id)"
+              >
+                <div class="relation-header">
+                  <span class="relation-icon">🔋</span>
+                  <span class="relation-title">Бесперебойник</span>
+                  <span class="relation-subtitle">{{ emp.ups.model }}</span>
                 </div>
-                <div class="detail-item">
-                  <span class="label">Последняя замена АКБ:</span>
-                  <span class="value">{{ formatDate(emp.ups.battery_replaced_at) || 'не заменялся' }}</span>
-                </div>
-                <div v-if="emp.ups.battery_history && emp.ups.battery_history.length" class="history-list">
-                  <div class="history-title">📋 История замен АКБ:</div>
-                  <div v-for="hist in emp.ups.battery_history" :key="hist.id" class="history-item">
-                    <span class="history-date">{{ formatDate(hist.replaced_at) }}</span>
-                    <span>📤 {{ hist.old_battery_serial || 'не указан' }} → 📥 {{ hist.new_battery_serial }}</span>
-                    <span v-if="hist.performed_by" class="history-performer">👤 {{ hist.performed_by }}</span>
-                  </div>
+                <div class="relation-date">
+                  🔋 АКБ: {{ formatDate(emp.ups.battery_replaced_at) || 'не заменялся' }}
                 </div>
               </div>
               
               <!-- МФУ -->
-              <div v-if="emp.mfp" class="relation-block">
-                <div class="relation-title">🖨️ МФУ</div>
-                <div class="detail-item" @click="openEditModal('mfp', { id: emp.mfp.id, asset_number: emp.mfp.asset_number })">
-                  <span class="label">Модель:</span>
-                  <span class="value clickable-field">{{ emp.mfp.model }}</span>
-                  <span class="edit-hint">✏️</span>
+              <div 
+                v-if="emp.mfp" 
+                class="relation-section"
+                @click="openDetailsModal('mfp', emp.mfp.id)"
+              >
+                <div class="relation-header">
+                  <span class="relation-icon">🖨️</span>
+                  <span class="relation-title">МФУ</span>
+                  <span class="relation-subtitle">{{ emp.mfp.model }}</span>
                 </div>
+                <div class="relation-ip">IP: {{ emp.mfp.ip_address || 'не указан' }}</div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Остальные категории остаются без изменений... -->
+      <!-- Остальные категории (компьютеры, МФУ, ИБП, телевизоры) остаются без изменений -->
+      <!-- ... -->
     </div>
 
-    <!-- Модальное окно редактирования (остается без изменений) -->
+    <!-- Модальное окно для редактирования (с поиском отдела) -->
+    <div v-if="showEditModal" class="modal" :class="{ 'modal-higher': showDetailsModal }">
+      <div class="modal-content modal-large">
+        <h3>✏️ Редактировать {{ getEntityTypeName() }}</h3>
+        
+        <!-- Сотрудник с поиском отдела -->
+        <div v-if="editEntityType === 'employee'">
+          <div class="form-group">
+            <label>Фамилия:</label>
+            <input v-model="editData.last_name" class="search-input">
+          </div>
+          <div class="form-group">
+            <label>Имя:</label>
+            <input v-model="editData.first_name" class="search-input">
+          </div>
+          <div class="form-group">
+            <label>Отчество:</label>
+            <input v-model="editData.patronymic" class="search-input">
+          </div>
+          
+          <!-- Отдел с поиском -->
+          <div class="form-group">
+            <label>Отдел:</label>
+            <div class="search-wrapper">
+              <input 
+                type="text" 
+                v-model="departmentSearch" 
+                @input="searchDepartments"
+                @focus="searchDepartments"
+                placeholder="Поиск отдела..."
+                class="search-input"
+              >
+              <div v-if="departmentSearchResults.length" class="search-results">
+                <div 
+                  v-for="dep in departmentSearchResults" 
+                  :key="dep.id" 
+                  @click="selectDepartment(dep)"
+                  class="search-result-item"
+                >
+                  {{ dep.name }}
+                </div>
+              </div>
+            </div>
+            <div v-if="selectedDepartment" class="selected-tag">
+              {{ selectedDepartment.name }}
+              <button @click="selectedDepartment = null" class="remove-btn">×</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Компьютер -->
+        <div v-if="editEntityType === 'computer'">
+          <div class="form-group">
+            <label>Номер ОС:</label>
+            <input v-model="editData.asset_number" class="main-field">
+          </div>
+          <div class="form-group">
+            <label>Тип:</label>
+            <select v-model="editData.computer_type" class="search-input">
+              <option value="desktop">🖥️ Стационарный</option>
+              <option value="laptop">💻 Ноутбук</option>
+              <option value="all-in-one">🖥️ Моноблок</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Системный блок:</label>
+            <textarea v-model="editData.system_unit" rows="3" class="textarea-field"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Статус обслуживания:</label>
+            <select v-model="editData.service_status" class="search-input">
+              <option value="operational">✅ В эксплуатации</option>
+              <option value="repair">🔧 В ремонте</option>
+              <option value="upgrade">⚡ На модернизации</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="editData.has_keyboard"> Клавиатура
+            </label>
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="editData.has_mouse"> Мышь
+            </label>
+          </div>
+        </div>
+        
+        <!-- Остальные типы (МФУ, ИБП, телевизор, рабочее место) -->
+        <!-- ... -->
+        
+        <div class="modal-buttons">
+          <button @click="saveEdit" class="save-btn">💾 Сохранить</button>
+          <button @click="closeEditModal" class="cancel-btn">Отмена</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно для детализации -->
+    <div v-if="showDetailsModal" class="modal" :class="{ 'modal-higher': showEditModal }">
+      <div class="modal-content modal-large">
+        <h3>📋 {{ detailsTitle }}</h3>
+        
+        <!-- Детали рабочего места -->
+        <div v-if="detailsType === 'workplace' && detailsData" class="workplace-details">
+          <div class="detail-row">
+            <span class="detail-label">👤 Сотрудник:</span>
+            <span class="detail-value">{{ detailsData.employee_name }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">🏙️ Город:</span>
+            <span class="detail-value">{{ detailsData.city_name || 'Не указан' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">📊 Статус:</span>
+            <span :class="['status-badge', getWorkplaceStatusClass(detailsData.status)]">
+              {{ getWorkplaceStatusText(detailsData.status) }}
+            </span>
+          </div>
+          
+          <!-- Компьютер в рабочем месте -->
+          <div v-if="detailsData.computer_detail" class="sub-entity" @click.stop="openEditFromDetails('computer', detailsData.computer_detail)">
+            <div class="sub-entity-header">
+              <span>🖥️ Компьютер</span>
+              <span class="edit-link">✏️</span>
+            </div>
+            <div class="sub-entity-details">
+              <div>ОС №{{ detailsData.computer_detail.asset_number }}</div>
+              <div class="small">{{ detailsData.computer_detail.system_unit || 'Системный блок не указан' }}</div>
+            </div>
+          </div>
+          
+          <!-- МФУ в рабочем месте -->
+          <div v-if="detailsData.mfp_detail" class="sub-entity" @click.stop="openEditFromDetails('mfp', detailsData.mfp_detail)">
+            <div class="sub-entity-header">
+              <span>🖨️ МФУ</span>
+              <span class="edit-link">✏️</span>
+            </div>
+            <div class="sub-entity-details">
+              <div>{{ detailsData.mfp_detail.model }}</div>
+              <div class="small">IP: {{ detailsData.mfp_detail.ip_address || 'не указан' }}</div>
+            </div>
+          </div>
+          
+          <!-- ИБП в рабочем месте -->
+          <div v-if="detailsData.ups_detail" class="sub-entity" @click.stop="openEditFromDetails('ups', detailsData.ups_detail)">
+            <div class="sub-entity-header">
+              <span>🔋 ИБП</span>
+              <span class="edit-link">✏️</span>
+            </div>
+            <div class="sub-entity-details">
+              <div>{{ detailsData.ups_detail.model }}</div>
+              <div class="small">АКБ заменён: {{ formatDate(detailsData.ups_detail.battery_replaced_at) || 'не заменялся' }}</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Остальные типы детализации -->
+        <!-- ... -->
+        
+        <div class="modal-buttons">
+          <button v-if="detailsData" @click="openEditFromDetails(detailsType, detailsData)" class="save-btn">✏️ Редактировать</button>
+          <button @click="closeDetailsModal" class="cancel-btn">Закрыть</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import axios from 'axios'
-import { showSuccess, showError, showWarning } from '../utils/toast'
+import { showSuccess, showError } from '../utils/toast'
 
 const route = useRoute()
-const router = useRouter()
 const API = 'http://localhost:8000/api'
 
 const searchQuery = ref('')
@@ -140,11 +297,21 @@ const searched = ref(false)
 // Данные для редактирования
 const showEditModal = ref(false)
 const editEntityType = ref('')
-const editEntityTitle = ref('')
 const editData = ref({})
 const editEntityId = ref(null)
 const allDepartments = ref([])
 const allLocations = ref([])
+
+// Поиск отдела
+const departmentSearch = ref('')
+const departmentSearchResults = ref([])
+const selectedDepartment = ref(null)
+
+// Данные для детализации
+const showDetailsModal = ref(false)
+const detailsType = ref('')
+const detailsData = ref(null)
+const detailsId = ref(null)
 
 const hasResults = computed(() => {
   const results = searchResults.value
@@ -153,9 +320,7 @@ const hasResults = computed(() => {
     results.computers?.length || 
     results.mfps?.length || 
     results.tvs?.length || 
-    results.ups?.length ||
-    results.departments?.length ||
-    results.locations?.length)
+    results.ups?.length)
 })
 
 const totalResults = computed(() => {
@@ -165,9 +330,18 @@ const totalResults = computed(() => {
     (results.computers?.length || 0) +
     (results.mfps?.length || 0) +
     (results.tvs?.length || 0) +
-    (results.ups?.length || 0) +
-    (results.departments?.length || 0) +
-    (results.locations?.length || 0)
+    (results.ups?.length || 0)
+})
+
+const detailsTitle = computed(() => {
+  const titles = {
+    'workplace': 'Детали рабочего места',
+    'computer': 'Детали компьютера',
+    'ups': 'Детали ИБП',
+    'mfp': 'Детали МФУ',
+    'employee': 'Детали сотрудника'
+  }
+  return titles[detailsType.value] || 'Детали'
 })
 
 // Форматирование даты
@@ -226,6 +400,19 @@ const getUPSStatusClass = (status) => {
   return classMap[status] || ''
 }
 
+// Получение названия типа сущности
+const getEntityTypeName = () => {
+  const names = {
+    'employee': 'сотрудника',
+    'computer': 'компьютер',
+    'ups': 'ИБП',
+    'mfp': 'МФУ',
+    'tv': 'телевизор',
+    'workplace': 'рабочее место'
+  }
+  return names[editEntityType.value] || ''
+}
+
 // Загрузка данных для выпадающих списков
 const fetchSelectData = async () => {
   try {
@@ -240,46 +427,106 @@ const fetchSelectData = async () => {
   }
 }
 
+// Поиск отделов
+const searchDepartments = () => {
+  if (!departmentSearch.value) {
+    departmentSearchResults.value = []
+    return
+  }
+  departmentSearchResults.value = allDepartments.value.filter(d => 
+    d.name.toLowerCase().includes(departmentSearch.value.toLowerCase())
+  ).slice(0, 10)
+}
+
+const selectDepartment = (department) => {
+  selectedDepartment.value = department
+  editData.value.department = department.id
+  departmentSearch.value = ''
+  departmentSearchResults.value = []
+}
+
+// Открытие модального окна детализации
+const openDetailsModal = async (type, id) => {
+  try {
+    let response
+    switch (type) {
+      case 'workplace':
+        response = await axios.get(`${API}/workplaces/${id}/`)
+        break
+      case 'computer':
+        response = await axios.get(`${API}/computers/${id}/`)
+        break
+      case 'ups':
+        response = await axios.get(`${API}/ups/${id}/`)
+        break
+      case 'mfp':
+        response = await axios.get(`${API}/mfps/${id}/`)
+        break
+      case 'employee':
+        response = await axios.get(`${API}/employees/${id}/`)
+        break
+    }
+    detailsType.value = type
+    detailsData.value = response.data
+    detailsId.value = id
+    showDetailsModal.value = true
+  } catch (error) {
+    console.error('Ошибка загрузки деталей:', error)
+    showError('Ошибка загрузки деталей')
+  }
+}
+
+// Открытие редактирования из деталей (закрывает окно деталей и открывает редактирование)
+const openEditFromDetails = (type, data) => {
+  // Закрываем окно детализации
+  showDetailsModal.value = false
+  
+  // Небольшая задержка для плавного перехода
+  setTimeout(() => {
+    openEditModal(type, data)
+  }, 100)
+}
+
+// Закрытие окна детализации
+const closeDetailsModal = () => {
+  showDetailsModal.value = false
+  detailsType.value = ''
+  detailsData.value = null
+  detailsId.value = null
+}
+
 // Открытие модального окна редактирования
 const openEditModal = (type, entity) => {
   editEntityType.value = type
   editEntityId.value = entity.id
   editData.value = { ...entity }
   
-  switch (type) {
-    case 'employee':
-      editEntityTitle.value = `Сотрудника: ${entity.full_name || `${entity.last_name} ${entity.first_name}`}`
-      break
-    case 'computer':
-      editEntityTitle.value = `Компьютер: ОС №${entity.asset_number}`
-      break
-    case 'ups':
-      editEntityTitle.value = `ИБП: ОС №${entity.asset_number}`
-      break
-    case 'mfp':
-      editEntityTitle.value = `МФУ: ОС №${entity.asset_number}`
-      break
-    case 'tv':
-      editEntityTitle.value = `Телевизор: ${entity.brand}`
-      break
-    case 'workplace':
-      editEntityTitle.value = `Рабочее место: ${entity.employee_name}`
-      break
-    case 'department':
-      editEntityTitle.value = `Отдел: ${entity.name}`
-      break
-    case 'location':
-      editEntityTitle.value = `Локация: ${entity.name}`
-      break
+  // Для сотрудника восстанавливаем выбранный отдел
+  if (type === 'employee' && entity.department) {
+    selectedDepartment.value = allDepartments.value.find(d => d.id === entity.department) || null
+  } else {
+    selectedDepartment.value = null
   }
   
+  departmentSearch.value = ''
+  departmentSearchResults.value = []
   showEditModal.value = true
+}
+
+// Закрытие окна редактирования
+const closeEditModal = () => {
+  showEditModal.value = false
+  editEntityType.value = ''
+  editData.value = {}
+  editEntityId.value = null
+  selectedDepartment.value = null
+  departmentSearch.value = ''
+  departmentSearchResults.value = []
 }
 
 // Сохранение изменений
 const saveEdit = async () => {
   try {
-    let response
     let updateData = {}
     
     switch (editEntityType.value) {
@@ -290,15 +537,18 @@ const saveEdit = async () => {
           patronymic: editData.value.patronymic || null,
           department: editData.value.department || null
         }
-        response = await axios.put(`${API}/employees/${editEntityId.value}/`, updateData)
+        await axios.put(`${API}/employees/${editEntityId.value}/`, updateData)
         break
       case 'computer':
         updateData = {
           asset_number: editData.value.asset_number,
           computer_type: editData.value.computer_type,
-          system_unit: editData.value.system_unit
+          system_unit: editData.value.system_unit,
+          service_status: editData.value.service_status,
+          has_keyboard: editData.value.has_keyboard,
+          has_mouse: editData.value.has_mouse
         }
-        response = await axios.put(`${API}/computers/${editEntityId.value}/`, updateData)
+        await axios.put(`${API}/computers/${editEntityId.value}/`, updateData)
         break
       case 'ups':
         updateData = {
@@ -307,7 +557,7 @@ const saveEdit = async () => {
           status: editData.value.status,
           comment: editData.value.comment || null
         }
-        response = await axios.put(`${API}/ups/${editEntityId.value}/`, updateData)
+        await axios.put(`${API}/ups/${editEntityId.value}/`, updateData)
         break
       case 'mfp':
         updateData = {
@@ -315,7 +565,7 @@ const saveEdit = async () => {
           model: editData.value.model,
           ip_address: editData.value.ip_address || null
         }
-        response = await axios.put(`${API}/mfps/${editEntityId.value}/`, updateData)
+        await axios.put(`${API}/mfps/${editEntityId.value}/`, updateData)
         break
       case 'tv':
         updateData = {
@@ -324,28 +574,20 @@ const saveEdit = async () => {
           size: editData.value.size,
           location: editData.value.location || null
         }
-        response = await axios.put(`${API}/tvs/${editEntityId.value}/`, updateData)
+        await axios.put(`${API}/tvs/${editEntityId.value}/`, updateData)
         break
       case 'workplace':
         updateData = {
           city: editData.value.city || null,
           status: editData.value.status
         }
-        response = await axios.patch(`${API}/workplaces/${editEntityId.value}/`, updateData)
-        break
-      case 'department':
-        updateData = { name: editData.value.name }
-        response = await axios.put(`${API}/departments/${editEntityId.value}/`, updateData)
-        break
-      case 'location':
-        updateData = { name: editData.value.name }
-        response = await axios.put(`${API}/locations/${editEntityId.value}/`, updateData)
+        await axios.patch(`${API}/workplaces/${editEntityId.value}/`, updateData)
         break
     }
     
-    showEditModal.value = false
-    showSuccess(`${editEntityType.value} успешно обновлен!`)
-    await performSearch() // Обновляем результаты поиска
+    closeEditModal()
+    await performSearch()
+    showSuccess(`${getEntityTypeName()} успешно обновлен!`)
   } catch (error) {
     console.error('Ошибка сохранения:', error)
     showError('Ошибка сохранения: ' + (error.response?.data?.detail || error.message))
@@ -367,7 +609,6 @@ const performSearch = async () => {
     const response = await axios.get(`${API}/global-search/search/`, {
       params: { q: searchQuery.value }
     })
-    console.log('Результаты поиска:', response.data) // Отладка
     searchResults.value = response.data
   } catch (error) {
     console.error('Ошибка поиска:', error)
@@ -376,14 +617,6 @@ const performSearch = async () => {
   } finally {
     loading.value = false
   }
-}
-
-// Очистка поиска
-const clearSearch = () => {
-  searchQuery.value = ''
-  searched.value = false
-  searchResults.value = {}
-  router.push({ path: '/' })
 }
 
 // Следим за изменением параметра в URL
@@ -398,7 +631,6 @@ watch(() => route.query.q, (newQuery) => {
   }
 })
 
-// Инициализация из URL параметра
 onMounted(() => {
   const query = route.query.q
   if (query) {
@@ -410,64 +642,103 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* Все стили остаются как в предыдущей версии */
+/* Все предыдущие стили остаются, добавляем новые */
+
+.search-wrapper {
+  position: relative;
+}
+
+.search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1002;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.search-result-item {
+  padding: 10px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+  transition: background 0.2s;
+}
+
+.search-result-item:hover {
+  background: #f0f0f0;
+}
+
+.selected-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #e8f5e9;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-top: 8px;
+}
+
+.remove-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #999;
+  padding: 0 5px;
+  line-height: 1;
+}
+
+.remove-btn:hover {
+  color: #e74c3c;
+}
+
+/* Стили для z-index модальных окон */
+.modal {
+  z-index: 1000;
+}
+
+.modal-higher {
+  z-index: 1002 !important;
+}
+
 .page {
   max-width: 1400px;
   margin: 0 auto;
   padding: 1rem;
 }
 
-h1 {
-  color: #2c3e50;
-  margin-bottom: 1.5rem;
-}
-
-.search-info {
-  background: white;
-  padding: 1rem 1.5rem;
-  border-radius: 12px;
-  margin-bottom: 1.5rem;
+.search-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 2rem;
   flex-wrap: wrap;
   gap: 1rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
-.search-query {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.query-label {
-  font-weight: bold;
-  color: #666;
-}
-
-.query-text {
-  background: #e8f5e9;
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-weight: bold;
+.search-header h1 {
   color: #2c3e50;
+  margin: 0;
 }
 
-.clear-btn {
-  background: #e74c3c;
-  color: white;
-  border: none;
-  padding: 5px 12px;
+.search-stats {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.stat-badge {
+  background: #e8f5e9;
+  padding: 0.5rem 1rem;
   border-radius: 20px;
-  cursor: pointer;
-  font-size: 0.85rem;
-}
-
-.results-count {
-  color: #666;
-  font-weight: 500;
+  font-size: 0.9rem;
+  color: #2c3e50;
 }
 
 .loading {
@@ -492,9 +763,15 @@ h1 {
 
 .no-results {
   text-align: center;
-  padding: 50px;
+  padding: 60px;
   background: white;
-  border-radius: 12px;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.no-results-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
 }
 
 .no-results p {
@@ -505,6 +782,7 @@ h1 {
 .hint {
   font-size: 0.9rem;
   color: #999;
+  margin-top: 0.5rem;
 }
 
 .results {
@@ -514,182 +792,215 @@ h1 {
 }
 
 .result-category {
+  margin-bottom: 0.5rem;
+}
+
+.category-header {
   margin-bottom: 1rem;
 }
 
 .category-title {
-  font-size: 1.3rem;
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 2px solid #1abc9c;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.75rem;
 }
 
 .category-icon {
   font-size: 1.5rem;
 }
 
-.cards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-  gap: 1rem;
+.category-title h2 {
+  font-size: 1.3rem;
+  color: #2c3e50;
+  margin: 0;
 }
 
-.small-grid {
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+.count {
+  background: #e0e0e0;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  color: #555;
+}
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 1rem;
 }
 
 .result-card {
   background: white;
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transition: all 0.3s ease;
 }
 
 .result-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.12);
 }
 
 .card-header {
-  padding: 12px 15px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #eee;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #fff 100%);
+  border-bottom: 1px solid #eee;
 }
 
-.card-header strong {
+.header-icon {
+  width: 40px;
+  height: 40px;
+  background: #e8f5e9;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+}
+
+.header-info {
+  flex: 1;
+}
+
+.title {
+  font-weight: 600;
   font-size: 1rem;
   color: #2c3e50;
 }
 
-.card-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+.subtitle {
+  font-size: 0.75rem;
+  color: #999;
+  margin-top: 2px;
 }
 
-.badge {
-  background: #1abc9c;
-  color: white;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 0.7rem;
-  font-weight: 500;
-}
-
-.edit-btn-small {
+.edit-icon-btn {
   background: none;
   border: none;
-  font-size: 0.9rem;
+  font-size: 1rem;
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
   color: #3498db;
   transition: all 0.2s;
 }
 
-.edit-btn-small:hover {
+.edit-icon-btn:hover {
   background: #3498db;
   color: white;
 }
 
-.card-body {
-  padding: 15px;
+.card-content {
+  padding: 16px;
 }
 
-.detail-item {
-  margin-bottom: 8px;
-  font-size: 0.85rem;
+.relation-section {
+  margin-bottom: 12px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.relation-section:hover {
+  background: #fff9e6;
+  transform: translateX(4px);
+}
+
+.relation-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
   flex-wrap: wrap;
-  padding: 4px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.2s;
 }
 
-.detail-item:hover {
-  background: rgba(26, 188, 156, 0.1);
-}
-
-.clickable-field {
-  cursor: pointer;
-}
-
-.edit-hint {
-  opacity: 0;
-  margin-left: 8px;
-  font-size: 0.7rem;
-  color: #1abc9c;
-  transition: opacity 0.2s;
-}
-
-.detail-item:hover .edit-hint {
-  opacity: 1;
-}
-
-.label {
-  font-weight: 600;
-  color: #666;
-  min-width: 120px;
-}
-
-.value {
-  color: #333;
-  flex: 1;
-}
-
-.relation-block {
-  margin-top: 12px;
-  padding-top: 8px;
-  border-top: 1px dashed #ddd;
+.relation-icon {
+  font-size: 1rem;
 }
 
 .relation-title {
   font-weight: 600;
-  color: #1abc9c;
-  margin-bottom: 8px;
   font-size: 0.85rem;
+  color: #1abc9c;
 }
 
-.history-list {
-  margin-top: 8px;
-  padding-left: 10px;
-  border-left: 2px solid #1abc9c;
+.relation-subtitle {
+  font-size: 0.8rem;
+  color: #666;
+  margin-left: auto;
+}
+
+.relation-city {
+  font-size: 0.7rem;
+  color: #999;
+  margin-left: auto;
+}
+
+.relation-type {
+  font-size: 0.75rem;
+  color: #666;
+  padding-left: 24px;
+}
+
+.relation-date {
+  font-size: 0.7rem;
+  color: #27ae60;
+  padding-left: 24px;
+}
+
+.relation-ip {
+  font-size: 0.7rem;
+  color: #3498db;
+  padding-left: 24px;
+}
+
+.relation-status {
+  padding-left: 24px;
+}
+
+.detail-item {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.detail-item .label {
+  font-weight: 500;
+  color: #666;
+  min-width: 85px;
+}
+
+.detail-item .value {
+  color: #333;
+}
+
+.history-preview {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #ddd;
 }
 
 .history-title {
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: #666;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
 }
 
-.history-item {
-  font-size: 0.75rem;
-  padding: 4px 0;
-  border-bottom: 1px solid #eee;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.history-date {
-  color: #1abc9c;
-  font-weight: 500;
-}
-
-.history-performer {
+.history-mini {
+  font-size: 0.7rem;
   color: #999;
+  padding: 2px 0;
 }
 
 .status-badge {
@@ -725,7 +1036,7 @@ h1 {
   color: #856404;
 }
 
-/* Модальное окно */
+/* Модальные окна */
 .modal {
   position: fixed;
   top: 0;
@@ -736,16 +1047,18 @@ h1 {
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 1001;
 }
 
 .modal-content {
   background: white;
   padding: 2rem;
-  border-radius: 16px;
+  border-radius: 20px;
   width: 90%;
-  max-width: 600px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  max-width: 550px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+  max-height: 80vh;
+  overflow-y: auto;
 }
 
 .modal-large {
@@ -776,10 +1089,10 @@ h1 {
 
 .main-field, .search-input, .textarea-field {
   width: 100%;
-  padding: 10px;
+  padding: 10px 12px;
   border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 1rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
 }
 
 .main-field {
@@ -790,6 +1103,17 @@ h1 {
 .textarea-field {
   resize: vertical;
   font-family: inherit;
+}
+
+.ip-input {
+  font-family: 'Courier New', monospace;
+}
+
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
 }
 
 .modal-buttons {
@@ -804,7 +1128,7 @@ h1 {
   color: white;
   border: none;
   padding: 10px 20px;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
 }
 
@@ -817,12 +1141,98 @@ h1 {
   color: white;
   border: none;
   padding: 10px 20px;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
 }
 
 .cancel-btn:hover {
   background: #c0392b;
+}
+
+/* Детали */
+.detail-row {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  flex-wrap: wrap;
+  padding: 6px 0;
+}
+
+.detail-label {
+  font-weight: 600;
+  color: #555;
+  min-width: 110px;
+}
+
+.detail-value {
+  color: #333;
+  flex: 1;
+}
+
+.sub-entity {
+  margin-top: 12px;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sub-entity:hover {
+  background: #e8f5e9;
+}
+
+.sub-entity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: #1abc9c;
+}
+
+.edit-link {
+  color: #3498db;
+  font-size: 0.7rem;
+}
+
+.sub-entity-details {
+  font-size: 0.75rem;
+  color: #666;
+  padding-left: 8px;
+}
+
+.small {
+  font-size: 0.65rem;
+  color: #999;
+  margin-top: 2px;
+}
+
+.history-list {
+  margin-top: 12px;
+}
+
+.history-item {
+  padding: 8px;
+  margin: 5px 0;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 3px solid #1abc9c;
+}
+
+.history-date {
+  font-weight: 600;
+  color: #1abc9c;
+  font-size: 0.7rem;
+  margin-bottom: 4px;
+}
+
+.history-performer {
+  font-size: 0.65rem;
+  color: #999;
+  margin-top: 4px;
 }
 
 @media (max-width: 768px) {
@@ -839,7 +1249,24 @@ h1 {
     flex-direction: column;
   }
   
-  .label {
+  .detail-item .label {
+    margin-bottom: 2px;
+  }
+  
+  .relation-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .relation-subtitle, .relation-city {
+    margin-left: 0;
+  }
+  
+  .detail-row {
+    flex-direction: column;
+  }
+  
+  .detail-label {
     margin-bottom: 4px;
   }
 }
