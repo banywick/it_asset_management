@@ -41,11 +41,11 @@
             </div>
             
             <div class="card-content">
-              <!-- Рабочее место -->
+              <!-- Только рабочее место -->
               <div 
                 v-if="emp.workplace" 
                 class="relation-section"
-                @click="openDetailsModal('workplace', emp.workplace.id)"
+                @click="openWorkplaceDetails(emp.workplace.id)"
               >
                 <div class="relation-header">
                   <span class="relation-icon">🏢</span>
@@ -57,50 +57,6 @@
                     {{ getWorkplaceStatusText(emp.workplace.status) }}
                   </span>
                 </div>
-              </div>
-              
-              <!-- Компьютер -->
-              <div 
-                v-if="emp.computer" 
-                class="relation-section"
-                @click="openDetailsModal('computer', emp.computer.id)"
-              >
-                <div class="relation-header">
-                  <span class="relation-icon">🖥️</span>
-                  <span class="relation-title">Закрепленный компьютер</span>
-                  <span class="relation-subtitle">ОС №{{ emp.computer.asset_number }}</span>
-                </div>
-                <div class="relation-type">{{ getComputerTypeText(emp.computer.computer_type) }}</div>
-              </div>
-              
-              <!-- ИБП -->
-              <div 
-                v-if="emp.ups" 
-                class="relation-section"
-                @click="openDetailsModal('ups', emp.ups.id)"
-              >
-                <div class="relation-header">
-                  <span class="relation-icon">🔋</span>
-                  <span class="relation-title">Бесперебойник</span>
-                  <span class="relation-subtitle">{{ emp.ups.model }}</span>
-                </div>
-                <div class="relation-date">
-                  🔋 АКБ: {{ formatDate(emp.ups.battery_replaced_at) || 'не заменялся' }}
-                </div>
-              </div>
-              
-              <!-- МФУ -->
-              <div 
-                v-if="emp.mfp" 
-                class="relation-section"
-                @click="openDetailsModal('mfp', emp.mfp.id)"
-              >
-                <div class="relation-header">
-                  <span class="relation-icon">🖨️</span>
-                  <span class="relation-title">МФУ</span>
-                  <span class="relation-subtitle">{{ emp.mfp.model }}</span>
-                </div>
-                <div class="relation-ip">IP: {{ emp.mfp.ip_address || 'не указан' }}</div>
               </div>
             </div>
           </div>
@@ -135,16 +91,18 @@
                 <span class="label">Мониторы:</span>
                 <span class="value">{{ comp.monitors?.map(m => m.brand).join(', ') || 'нет' }}</span>
               </div>
+              <!-- Рабочее место где используется компьютер -->
               <div 
-                v-if="comp.assigned_to" 
+                v-if="comp.workplace" 
                 class="relation-section"
-                @click="openDetailsModal('employee', comp.assigned_to.id)"
+                @click="openWorkplaceDetails(comp.workplace.id)"
               >
                 <div class="relation-header">
-                  <span class="relation-icon">👤</span>
-                  <span class="relation-title">Закреплен за</span>
-                  <span class="relation-subtitle">{{ comp.assigned_to.full_name }}</span>
+                  <span class="relation-icon">🏢</span>
+                  <span class="relation-title">Рабочее место</span>
+                  <span class="relation-subtitle">{{ comp.workplace.employee_name || 'Сотрудник не указан' }}</span>
                 </div>
+                <div class="relation-city">{{ comp.workplace.city || 'Город не указан' }}</div>
               </div>
             </div>
           </div>
@@ -175,11 +133,12 @@
                 <span class="label">IP адрес:</span>
                 <span class="value">{{ mfp.ip_address || 'не указан' }}</span>
               </div>
+              <!-- Рабочие места где используется МФУ -->
               <div 
                 v-for="wp in mfp.used_in_workplaces" 
                 :key="wp.id"
                 class="relation-section"
-                @click="openDetailsModal('workplace', wp.id)"
+                @click="openWorkplaceDetails(wp.id)"
               >
                 <div class="relation-header">
                   <span class="relation-icon">🏢</span>
@@ -210,7 +169,10 @@
                 <div class="title">ОС №{{ ups.asset_number }}</div>
                 <div class="subtitle">{{ ups.model }}</div>
               </div>
-              <button @click="openEditModal('ups', ups)" class="edit-icon-btn" title="Редактировать">✏️</button>
+              <div class="card-actions">
+                <button @click="openUPSServiceModal(ups)" class="service-icon-btn" title="Обслуживание">🔧</button>
+                <button @click="openEditModal('ups', ups)" class="edit-icon-btn" title="Редактировать">✏️</button>
+              </div>
             </div>
             <div class="card-content">
               <div class="detail-item">
@@ -220,18 +182,22 @@
                 </span>
               </div>
               <div class="detail-item">
-                <!-- <span class="label">Аккумулятор:</span>
-                <span class="value">{{ ups.battery_serial_number || 'не указан' }}</span> -->
+                <span class="label">Аккумулятор:</span>
+                <span class="value">{{ ups.battery_serial_number || 'не указан' }}</span>
               </div>
-              <div class="detail-item">
-                <span class="label">Замена АКБ:</span>
-                <span class="value">{{ formatDate(ups.battery_replaced_at) || 'не заменялся' }}</span>
+              <!-- История замен -->
+              <div v-if="ups.battery_history?.length" class="history-preview">
+                <div class="history-title">📋 Последние замены АКБ:</div>
+                <div v-for="hist in ups.battery_history.slice(0, 2)" :key="hist.id" class="history-mini">
+                  {{ formatDate(hist.replaced_at) }}: {{ hist.new_battery_serial }}
+                </div>
               </div>
+              <!-- Рабочие места где используется ИБП -->
               <div 
                 v-for="wp in ups.used_in_workplaces" 
                 :key="wp.id"
                 class="relation-section"
-                @click="openDetailsModal('workplace', wp.id)"
+                @click="openWorkplaceDetails(wp.id)"
               >
                 <div class="relation-header">
                   <span class="relation-icon">🏢</span>
@@ -239,12 +205,6 @@
                   <span class="relation-subtitle">{{ wp.employee_name }}</span>
                 </div>
                 <div class="relation-city">{{ wp.city || 'Город не указан' }}</div>
-              </div>
-              <div v-if="ups.battery_history?.length" class="history-preview">
-                <div class="history-title">📋 Последние замены АКБ:</div>
-                <div v-for="hist in ups.battery_history.slice(0, 2)" :key="hist.id" class="history-mini">
-                  {{ formatDate(hist.replaced_at) }}: {{ hist.new_battery_serial }}
-                </div>
               </div>
             </div>
           </div>
@@ -285,8 +245,132 @@
       </div>
     </div>
 
+    <!-- Модальное окно детализации рабочего места -->
+    <div v-if="showWorkplaceModal" class="modal" :class="{ 'modal-higher': showEditModal || showUPSServiceModal }">
+      <div class="modal-content modal-large">
+        <h3>🏢 Детали рабочего места</h3>
+        <p class="modal-subtitle">Сотрудник: <strong>{{ workplaceDetails?.employee_name }}</strong></p>
+        
+        <div class="workplace-details">
+          <div class="detail-row">
+            <span class="detail-label">👤 Отдел:</span>
+            <span class="detail-value">{{ workplaceDetails?.department_name || 'Не указан' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">🏙️ Город:</span>
+            <span class="detail-value">{{ workplaceDetails?.city_name || 'Не указан' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">📊 Статус:</span>
+            <span :class="['status-badge', getWorkplaceStatusClass(workplaceDetails?.status)]">
+              {{ getWorkplaceStatusText(workplaceDetails?.status) }}
+            </span>
+          </div>
+          
+          <!-- Компьютер -->
+          <div v-if="workplaceDetails?.computer_detail" class="sub-entity" @click.stop="openEditFromWorkplace('computer', workplaceDetails.computer_detail.id)">
+            <div class="sub-entity-header">
+              <span>🖥️ Компьютер</span>
+              <span class="edit-link">✏️</span>
+            </div>
+            <div class="sub-entity-details">
+              <div>ОС №{{ workplaceDetails.computer_detail.asset_number }}</div>
+              <div class="small">{{ workplaceDetails.computer_detail.system_unit || 'Системный блок не указан' }}</div>
+            </div>
+          </div>
+          
+          <!-- МФУ -->
+          <div v-if="workplaceDetails?.mfp_detail" class="sub-entity" @click.stop="openEditFromWorkplace('mfp', workplaceDetails.mfp_detail.id)">
+            <div class="sub-entity-header">
+              <span>🖨️ МФУ</span>
+              <span class="edit-link">✏️</span>
+            </div>
+            <div class="sub-entity-details">
+              <div>{{ workplaceDetails.mfp_detail.model }}</div>
+              <div class="small">IP: {{ workplaceDetails.mfp_detail.ip_address || 'не указан' }}</div>
+            </div>
+          </div>
+          
+          <!-- ИБП с кнопкой обслуживания -->
+          <div v-if="workplaceDetails?.ups_detail" class="sub-entity">
+            <div class="sub-entity-header">
+              <span>🔋 ИБП</span>
+              <div class="sub-entity-actions">
+                <button @click.stop="openUPSServiceModal(workplaceDetails.ups_detail)" class="service-small-btn" title="Обслуживание">🔧</button>
+                <button @click.stop="openEditFromWorkplace('ups', workplaceDetails.ups_detail.id)" class="edit-link">✏️</button>
+              </div>
+            </div>
+            <div class="sub-entity-details">
+              <div>{{ workplaceDetails.ups_detail.model }}</div>
+              <!-- <div class="small">АКБ заменён: {{ formatDate(workplaceDetails.ups_detail.battery_replaced_at) || 'не заменялся' }}</div> -->
+            </div>
+          </div>
+        </div>
+        
+        <div class="modal-buttons">
+          <button @click="closeWorkplaceModal" class="cancel-btn">Закрыть</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно обслуживания ИБП -->
+    <div v-if="showUPSServiceModal" class="modal" :class="{ 'modal-higher': true }">
+      <div class="modal-content modal-large">
+        <h3>🔧 Обслуживание ИБП</h3>
+        <p class="modal-subtitle">ИБП: <strong>ОС №{{ selectedUPSForService?.asset_number }} - {{ selectedUPSForService?.model }}</strong></p>
+        
+        <div class="service-form">
+          <h4>➕ Замена аккумулятора</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Извлеченный АКБ:</label>
+              <input v-model="newBattery.old_battery_serial" placeholder="Серийный номер извлеченного АКБ" class="search-input">
+            </div>
+            <div class="form-group">
+              <label>Установленный АКБ:</label>
+              <input v-model="newBattery.new_battery_serial" placeholder="Серийный номер нового АКБ" class="search-input" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Кто выполнил замену:</label>
+            <input v-model="newBattery.performed_by" placeholder="ФИО сотрудника" class="search-input">
+          </div>
+          <div class="form-group">
+            <label>Комментарий:</label>
+            <textarea v-model="newBattery.comment" placeholder="Дополнительная информация о замене..." rows="2" class="textarea-field"></textarea>
+          </div>
+          <button @click="addUPSBatteryHistory" class="submit-btn small">💾 Добавить запись</button>
+        </div>
+        
+        <div class="history-section">
+          <h4>📋 История замен аккумуляторов</h4>
+          <div v-if="upsBatteryHistory.length" class="history-list">
+            <div v-for="record in upsBatteryHistory" :key="record.id" class="history-item">
+              <div class="history-header">
+                <span class="history-date">{{ formatDate(record.replaced_at) }}</span>
+                <button @click="deleteUPSBatteryHistory(record.id)" class="delete-small" title="Удалить запись">🗑️</button>
+              </div>
+              <div class="history-details">
+                <div>📤 Извлечен: <strong>{{ record.old_battery_serial || 'не указан' }}</strong></div>
+                <div>📥 Установлен: <strong>{{ record.new_battery_serial }}</strong></div>
+                <div v-if="record.performed_by">👤 Кто: {{ record.performed_by }}</div>
+                <div v-if="record.comment">💬 {{ record.comment }}</div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="no-data">
+            <p>😕 История замен отсутствует</p>
+          </div>
+        </div>
+        
+        <div class="modal-buttons">
+          <button @click="closeUPSServiceModal" class="cancel-btn">Закрыть</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Модальное окно для редактирования -->
-    <div v-if="showEditModal" class="modal" :class="{ 'modal-higher': showDetailsModal }">
+    <div v-if="showEditModal" class="modal" :class="{ 'modal-higher': showWorkplaceModal || showUPSServiceModal }">
       <div class="modal-content modal-large">
         <h3>✏️ Редактировать {{ getEntityTypeName() }}</h3>
         
@@ -431,183 +515,9 @@
           </div>
         </div>
         
-        <!-- Рабочее место -->
-        <div v-if="editEntityType === 'workplace'">
-          <div class="form-group">
-            <label>Город:</label>
-            <select v-model="editData.city" class="search-input">
-              <option :value="null">Выберите город</option>
-              <option v-for="city in allLocations" :key="city.id" :value="city.id">{{ city.name }}</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Статус:</label>
-            <select v-model="editData.status" class="search-input">
-              <option value="active">✅ Активно</option>
-              <option value="inactive">❌ Неактивно</option>
-              <option value="maintenance">🔧 На обслуживании</option>
-              <option value="repair">⚠️ Требует ремонта</option>
-            </select>
-          </div>
-        </div>
-        
         <div class="modal-buttons">
           <button @click="saveEdit" class="save-btn">💾 Сохранить</button>
           <button @click="closeEditModal" class="cancel-btn">Отмена</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Модальное окно для детализации -->
-    <div v-if="showDetailsModal" class="modal" :class="{ 'modal-higher': showEditModal }">
-      <div class="modal-content modal-large">
-        <h3>📋 {{ detailsTitle }}</h3>
-        
-        <!-- Детали рабочего места -->
-        <div v-if="detailsType === 'workplace' && detailsData" class="workplace-details">
-          <div class="detail-row">
-            <span class="detail-label">👤 Сотрудник:</span>
-            <span class="detail-value">{{ detailsData.employee_name }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">🏙️ Город:</span>
-            <span class="detail-value">{{ detailsData.city_name || 'Не указан' }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">📊 Статус:</span>
-            <span :class="['status-badge', getWorkplaceStatusClass(detailsData.status)]">
-              {{ getWorkplaceStatusText(detailsData.status) }}
-            </span>
-          </div>
-          
-          <!-- Компьютер в рабочем месте -->
-          <div v-if="detailsData.computer_detail" class="sub-entity" @click.stop="openEditFromDetails('computer', detailsData.computer_detail)">
-            <div class="sub-entity-header">
-              <span>🖥️ Компьютер</span>
-              <span class="edit-link">✏️</span>
-            </div>
-            <div class="sub-entity-details">
-              <div>ОС №{{ detailsData.computer_detail.asset_number }}</div>
-              <div class="small">{{ detailsData.computer_detail.system_unit || 'Системный блок не указан' }}</div>
-            </div>
-          </div>
-          
-          <!-- МФУ в рабочем месте -->
-          <div v-if="detailsData.mfp_detail" class="sub-entity" @click.stop="openEditFromDetails('mfp', detailsData.mfp_detail)">
-            <div class="sub-entity-header">
-              <span>🖨️ МФУ</span>
-              <span class="edit-link">✏️</span>
-            </div>
-            <div class="sub-entity-details">
-              <div>{{ detailsData.mfp_detail.model }}</div>
-              <div class="small">IP: {{ detailsData.mfp_detail.ip_address || 'не указан' }}</div>
-            </div>
-          </div>
-          
-          <!-- ИБП в рабочем месте -->
-          <div v-if="detailsData.ups_detail" class="sub-entity" @click.stop="openEditFromDetails('ups', detailsData.ups_detail)">
-            <div class="sub-entity-header">
-              <span>🔋 ИБП</span>
-              <span class="edit-link">✏️</span>
-            </div>
-            <div class="sub-entity-details">
-              <div>{{ detailsData.ups_detail.model }}</div>
-              <div class="small">АКБ заменён: {{ formatDate(detailsData.ups_detail.battery_replaced_at) || 'не заменялся' }}</div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Детали компьютера -->
-        <div v-if="detailsType === 'computer' && detailsData" class="computer-details">
-          <div class="detail-row">
-            <span class="detail-label">🆔 ОС №:</span>
-            <span class="detail-value">{{ detailsData.asset_number }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">💻 Системный блок:</span>
-            <span class="detail-value">{{ detailsData.system_unit || 'Не указан' }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">🖥️ Тип:</span>
-            <span class="detail-value">{{ getComputerTypeText(detailsData.computer_type) }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">🖥️ Мониторы:</span>
-            <span class="detail-value">{{ detailsData.monitors_detail?.map(m => m.brand).join(', ') || 'нет' }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">⌨️ Периферия:</span>
-            <span class="detail-value">{{ detailsData.has_keyboard ? 'Клавиатура' : '' }} {{ detailsData.has_mouse ? 'Мышь' : '' }}</span>
-          </div>
-        </div>
-        
-              <!-- Детали ИБП -->
-        <div v-if="detailsType === 'ups' && detailsData" class="ups-details">
-          <div class="detail-row">
-            <span class="detail-label">🔋 Модель:</span>
-            <span class="detail-value">{{ detailsData.model }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">📊 Статус:</span>
-            <span :class="['status-badge', getUPSStatusClass(detailsData.status)]">
-              {{ getUPSStatusText(detailsData.status) }}
-            </span>
-          </div>
-          <div class="detail-row">
-            <!-- <span class="detail-label">🔧 Аккумулятор:</span>
-            <span class="detail-value">{{ detailsData.battery_serial_number || 'не указан' }}</span> -->
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">📅 Последняя замена АКБ:</span>
-            <span class="detail-value">
-              <span v-if="detailsData.battery_replaced_at" class="battery-date">
-                {{ formatDate(detailsData.battery_replaced_at) }}
-              </span>
-              <span v-else class="no-data">не заменялся</span>
-            </span>
-          </div>
-          <div v-if="detailsData.battery_history?.length" class="history-list">
-            <div class="history-title">📋 История замен:</div>
-            <div v-for="hist in detailsData.battery_history" :key="hist.id" class="history-item">
-              <div class="history-date">{{ formatDate(hist.replaced_at) }}</div>
-              <div class="history-change">
-                <span class="old-battery">📤 {{ hist.old_battery_serial || 'не указан' }}</span>
-                <span class="arrow">→</span>
-                <span class="new-battery">📥 {{ hist.new_battery_serial }}</span>
-              </div>
-              <div v-if="hist.performed_by" class="history-performer">👤 {{ hist.performed_by }}</div>
-              <div v-if="hist.comment" class="history-comment">💬 {{ hist.comment }}</div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Детали МФУ -->
-        <div v-if="detailsType === 'mfp' && detailsData" class="mfp-details">
-          <div class="detail-row">
-            <span class="detail-label">📠 Модель:</span>
-            <span class="detail-value">{{ detailsData.model }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">🌐 IP адрес:</span>
-            <span class="detail-value">{{ detailsData.ip_address || 'не указан' }}</span>
-          </div>
-        </div>
-        
-        <!-- Детали сотрудника -->
-        <div v-if="detailsType === 'employee' && detailsData" class="employee-details">
-          <div class="detail-row">
-            <span class="detail-label">👤 ФИО:</span>
-            <span class="detail-value">{{ detailsData.last_name }} {{ detailsData.first_name }} {{ detailsData.patronymic || '' }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">📍 Отдел:</span>
-            <span class="detail-value">{{ detailsData.department_name || 'Не указан' }}</span>
-          </div>
-        </div>
-        
-        <div class="modal-buttons">
-          <button v-if="detailsData" @click="openEditFromDetails(detailsType, detailsData)" class="save-btn">✏️ Редактировать</button>
-          <button @click="closeDetailsModal" class="cancel-btn">Закрыть</button>
         </div>
       </div>
     </div>
@@ -618,7 +528,8 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
-import { showSuccess, showError } from '../utils/toast'
+import { showSuccess, showError, showWarning } from '../utils/toast'
+import ConfirmModal from '../components/ConfirmModal.vue'
 
 const route = useRoute()
 const API = 'http://localhost:8000/api'
@@ -641,11 +552,22 @@ const departmentSearch = ref('')
 const departmentSearchResults = ref([])
 const selectedDepartment = ref(null)
 
-// Данные для детализации
-const showDetailsModal = ref(false)
-const detailsType = ref('')
-const detailsData = ref(null)
-const detailsId = ref(null)
+// Данные для рабочего места
+const showWorkplaceModal = ref(false)
+const workplaceDetails = ref(null)
+
+// Данные для обслуживания ИБП
+const showUPSServiceModal = ref(false)
+const selectedUPSForService = ref(null)
+const upsBatteryHistory = ref([])
+const newBattery = ref({
+  old_battery_serial: '',
+  new_battery_serial: '',
+  performed_by: '',
+  comment: ''
+})
+
+const confirmModal = ref(null)
 
 const hasResults = computed(() => {
   const results = searchResults.value
@@ -665,17 +587,6 @@ const totalResults = computed(() => {
     (results.mfps?.length || 0) +
     (results.tvs?.length || 0) +
     (results.ups?.length || 0)
-})
-
-const detailsTitle = computed(() => {
-  const titles = {
-    'workplace': 'Детали рабочего места',
-    'computer': 'Детали компьютера',
-    'ups': 'Детали ИБП',
-    'mfp': 'Детали МФУ',
-    'employee': 'Детали сотрудника'
-  }
-  return titles[detailsType.value] || 'Детали'
 })
 
 // Форматирование даты
@@ -747,6 +658,54 @@ const getEntityTypeName = () => {
   return names[editEntityType.value] || ''
 }
 
+// Загрузка полных данных сущности по ID
+const fetchEntityData = async (type, id) => {
+  try {
+    let response
+    switch (type) {
+      case 'computer':
+        response = await axios.get(`${API}/computers/${id}/`)
+        break
+      case 'ups':
+        response = await axios.get(`${API}/ups/${id}/`)
+        break
+      case 'mfp':
+        response = await axios.get(`${API}/mfps/${id}/`)
+        break
+      case 'employee':
+        response = await axios.get(`${API}/employees/${id}/`)
+        break
+      case 'tv':
+        response = await axios.get(`${API}/tvs/${id}/`)
+        break
+      default:
+        return null
+    }
+    return response.data
+  } catch (error) {
+    console.error(`Ошибка загрузки ${type}:`, error)
+    return null
+  }
+}
+
+// Открытие редактирования из окна деталей рабочего места
+const openEditFromWorkplace = async (type, id) => {
+  // Закрываем окно детализации
+  showWorkplaceModal.value = false
+  
+  // Загружаем полные данные сущности
+  const entityData = await fetchEntityData(type, id)
+  
+  if (entityData) {
+    // Небольшая задержка для плавного перехода
+    setTimeout(() => {
+      openEditModal(type, entityData)
+    }, 100)
+  } else {
+    showError(`Не удалось загрузить данные для редактирования`)
+  }
+}
+
 // Загрузка данных для выпадающих списков
 const fetchSelectData = async () => {
   try {
@@ -779,54 +738,109 @@ const selectDepartment = (department) => {
   departmentSearchResults.value = []
 }
 
-// Открытие модального окна детализации
-const openDetailsModal = async (type, id) => {
+// Открытие деталей рабочего места
+const openWorkplaceDetails = async (id) => {
   try {
-    let response
-    switch (type) {
-      case 'workplace':
-        response = await axios.get(`${API}/workplaces/${id}/`)
-        break
-      case 'computer':
-        response = await axios.get(`${API}/computers/${id}/`)
-        break
-      case 'ups':
-        response = await axios.get(`${API}/ups/${id}/`)
-        break
-      case 'mfp':
-        response = await axios.get(`${API}/mfps/${id}/`)
-        break
-      case 'employee':
-        response = await axios.get(`${API}/employees/${id}/`)
-        break
-    }
-    detailsType.value = type
-    detailsData.value = response.data
-    detailsId.value = id
-    showDetailsModal.value = true
+    const response = await axios.get(`${API}/workplaces/${id}/`)
+    workplaceDetails.value = response.data
+    showWorkplaceModal.value = true
   } catch (error) {
     console.error('Ошибка загрузки деталей:', error)
-    showError('Ошибка загрузки деталей')
+    showError('Ошибка загрузки деталей рабочего места')
   }
 }
 
-// Открытие редактирования из деталей
-const openEditFromDetails = (type, data) => {
-  // Закрываем окно детализации
-  showDetailsModal.value = false
-  
-  // Небольшая задержка для плавного перехода
-  setTimeout(() => {
-    openEditModal(type, data)
-  }, 100)
+const closeWorkplaceModal = () => {
+  showWorkplaceModal.value = false
+  workplaceDetails.value = null
 }
 
-// Закрытие окна детализации
-const closeDetailsModal = () => {
-  showDetailsModal.value = false
-  detailsType.value = ''
-  detailsData.value = null
-  detailsId.value = null
+// Загрузка истории замен для ИБП
+const fetchUPSBatteryHistory = async (upsId) => {
+  try {
+    const response = await axios.get(`${API}/battery-history/?ups=${upsId}`)
+    upsBatteryHistory.value = response.data
+  } catch (error) {
+    console.error('Ошибка загрузки истории:', error)
+    showError('Ошибка загрузки истории замен')
+  }
+}
+
+// Открытие модального окна обслуживания ИБП
+const openUPSServiceModal = async (ups) => {
+  selectedUPSForService.value = ups
+  await fetchUPSBatteryHistory(ups.id)
+  newBattery.value = {
+    old_battery_serial: '',
+    new_battery_serial: '',
+    performed_by: '',
+    comment: ''
+  }
+  showUPSServiceModal.value = true
+}
+
+const closeUPSServiceModal = () => {
+  showUPSServiceModal.value = false
+  selectedUPSForService.value = null
+  upsBatteryHistory.value = []
+}
+
+// Добавление записи о замене АКБ
+const addUPSBatteryHistory = async () => {
+  if (!newBattery.value.new_battery_serial) {
+    showWarning('Пожалуйста, укажите серийный номер установленного аккумулятора')
+    return
+  }
+  
+  try {
+    const historyData = {
+      ups: selectedUPSForService.value.id,
+      old_battery_serial: newBattery.value.old_battery_serial || null,
+      new_battery_serial: newBattery.value.new_battery_serial,
+      performed_by: newBattery.value.performed_by || null,
+      comment: newBattery.value.comment || null
+    }
+    
+    await axios.post(`${API}/battery-history/`, historyData)
+    await fetchUPSBatteryHistory(selectedUPSForService.value.id)
+    
+    // Обновляем данные в поиске
+    await performSearch()
+    
+    newBattery.value = {
+      old_battery_serial: '',
+      new_battery_serial: '',
+      performed_by: '',
+      comment: ''
+    }
+    
+    showSuccess('Замена аккумулятора зафиксирована!')
+  } catch (error) {
+    console.error('Ошибка добавления записи:', error)
+    showError('Ошибка добавления записи о замене')
+  }
+}
+
+// Удаление записи об обслуживании
+const deleteUPSBatteryHistory = async (id) => {
+  const confirmed = await confirmModal.value.open({
+    title: 'Удаление записи',
+    message: 'Вы уверены, что хотите удалить эту запись о замене аккумулятора?',
+    confirmText: 'Да, удалить',
+    type: 'danger'
+  })
+  
+  if (confirmed) {
+    try {
+      await axios.delete(`${API}/battery-history/${id}/`)
+      await fetchUPSBatteryHistory(selectedUPSForService.value.id)
+      await performSearch()
+      showSuccess('Запись удалена!')
+    } catch (error) {
+      console.error('Ошибка удаления:', error)
+      showError('Ошибка удаления записи')
+    }
+  }
 }
 
 // Открытие модального окна редактирования
@@ -835,7 +849,6 @@ const openEditModal = (type, entity) => {
   editEntityId.value = entity.id
   editData.value = { ...entity }
   
-  // Для сотрудника восстанавливаем выбранный отдел
   if (type === 'employee' && entity.department) {
     selectedDepartment.value = allDepartments.value.find(d => d.id === entity.department) || null
   } else {
@@ -847,7 +860,6 @@ const openEditModal = (type, entity) => {
   showEditModal.value = true
 }
 
-// Закрытие окна редактирования
 const closeEditModal = () => {
   showEditModal.value = false
   editEntityType.value = ''
@@ -910,13 +922,6 @@ const saveEdit = async () => {
         }
         await axios.put(`${API}/tvs/${editEntityId.value}/`, updateData)
         break
-      case 'workplace':
-        updateData = {
-          city: editData.value.city || null,
-          status: editData.value.status
-        }
-        await axios.patch(`${API}/workplaces/${editEntityId.value}/`, updateData)
-        break
     }
     
     closeEditModal()
@@ -943,7 +948,6 @@ const performSearch = async () => {
     const response = await axios.get(`${API}/global-search/search/`, {
       params: { q: searchQuery.value }
     })
-    console.log('Результаты поиска:', response.data)
     searchResults.value = response.data
   } catch (error) {
     console.error('Ошибка поиска:', error)
@@ -954,7 +958,6 @@ const performSearch = async () => {
   }
 }
 
-// Следим за изменением параметра в URL
 watch(() => route.query.q, (newQuery) => {
   if (newQuery) {
     searchQuery.value = newQuery
@@ -977,72 +980,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* Все предыдущие стили остаются, добавляем новые */
-
-.search-wrapper {
-  position: relative;
-}
-
-.search-results {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  max-height: 200px;
-  overflow-y: auto;
-  z-index: 1002;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-}
-
-.search-result-item {
-  padding: 10px 12px;
-  cursor: pointer;
-  border-bottom: 1px solid #eee;
-  transition: background 0.2s;
-}
-
-.search-result-item:hover {
-  background: #f0f0f0;
-}
-
-.selected-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: #e8f5e9;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  margin-top: 8px;
-}
-
-.remove-btn {
-  background: none;
-  border: none;
-  font-size: 1.2rem;
-  cursor: pointer;
-  color: #999;
-  padding: 0 5px;
-  line-height: 1;
-}
-
-.remove-btn:hover {
-  color: #e74c3c;
-}
-
-/* Стили для z-index модальных окон */
-.modal {
-  z-index: 1000;
-}
-
-.modal-higher {
-  z-index: 1002 !important;
-}
-
 .page {
   max-width: 1400px;
   margin: 0 auto;
@@ -1213,6 +1150,12 @@ onMounted(() => {
   margin-top: 2px;
 }
 
+.card-actions {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
 .edit-icon-btn {
   background: none;
   border: none;
@@ -1226,6 +1169,22 @@ onMounted(() => {
 
 .edit-icon-btn:hover {
   background: #3498db;
+  color: white;
+}
+
+.service-icon-btn {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: #f39c12;
+  transition: all 0.2s;
+}
+
+.service-icon-btn:hover {
+  background: #f39c12;
   color: white;
 }
 
@@ -1276,24 +1235,6 @@ onMounted(() => {
   font-size: 0.7rem;
   color: #999;
   margin-left: auto;
-}
-
-.relation-type {
-  font-size: 0.75rem;
-  color: #666;
-  padding-left: 24px;
-}
-
-.relation-date {
-  font-size: 0.7rem;
-  color: #27ae60;
-  padding-left: 24px;
-}
-
-.relation-ip {
-  font-size: 0.7rem;
-  color: #3498db;
-  padding-left: 24px;
 }
 
 .relation-status {
@@ -1382,7 +1323,11 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1001;
+  z-index: 1000;
+}
+
+.modal-higher {
+  z-index: 1002 !important;
 }
 
 .modal-content {
@@ -1484,7 +1429,11 @@ onMounted(() => {
   background: #c0392b;
 }
 
-/* Детали */
+/* Детали рабочего места */
+.workplace-details {
+  margin-top: 0.5rem;
+}
+
 .detail-row {
   display: flex;
   align-items: flex-start;
@@ -1528,9 +1477,32 @@ onMounted(() => {
   color: #1abc9c;
 }
 
+.sub-entity-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .edit-link {
   color: #3498db;
   font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.service-small-btn {
+  background: none;
+  border: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: #f39c12;
+  transition: all 0.2s;
+}
+
+.service-small-btn:hover {
+  background: #f39c12;
+  color: white;
 }
 
 .sub-entity-details {
@@ -1545,29 +1517,160 @@ onMounted(() => {
   margin-top: 2px;
 }
 
+/* Обслуживание ИБП */
+.service-form {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.service-form h4 {
+  margin-bottom: 1rem;
+  color: #2c3e50;
+}
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.form-row .form-group {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.submit-btn.small {
+  width: auto;
+  padding: 8px 16px;
+  margin-top: 0;
+  font-size: 0.9rem;
+}
+
+.history-section {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.history-section h4 {
+  margin-bottom: 1rem;
+  color: #2c3e50;
+}
+
 .history-list {
-  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .history-item {
-  padding: 8px;
-  margin: 5px 0;
   background: #f8f9fa;
   border-radius: 8px;
+  padding: 10px;
   border-left: 3px solid #1abc9c;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #eee;
 }
 
 .history-date {
   font-weight: 600;
   color: #1abc9c;
-  font-size: 0.7rem;
+  font-size: 0.8rem;
+}
+
+.delete-small {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #e74c3c;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.delete-small:hover {
+  background: #e74c3c;
+  color: white;
+}
+
+.history-details {
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.history-details div {
   margin-bottom: 4px;
 }
 
-.history-performer {
-  font-size: 0.65rem;
+.no-data {
   color: #999;
-  margin-top: 4px;
+  font-style: italic;
+  text-align: center;
+  padding: 20px;
+}
+
+.search-wrapper {
+  position: relative;
+}
+
+.search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1003;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.search-result-item {
+  padding: 10px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+  transition: background 0.2s;
+}
+
+.search-result-item:hover {
+  background: #f0f0f0;
+}
+
+.selected-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #e8f5e9;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-top: 8px;
+}
+
+.remove-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #999;
+  padding: 0 5px;
+  line-height: 1;
+}
+
+.remove-btn:hover {
+  color: #e74c3c;
 }
 
 @media (max-width: 768px) {
@@ -1603,6 +1706,14 @@ onMounted(() => {
   
   .detail-label {
     margin-bottom: 4px;
+  }
+  
+  .form-row {
+    flex-direction: column;
+  }
+  
+  .form-row .form-group {
+    margin-bottom: 1rem;
   }
 }
 </style>

@@ -7,31 +7,11 @@
           <input 
             type="text" 
             v-model="searchQuery" 
-            @input="onSearchInput"
             @keyup.enter="goToSearch"
-            @focus="showSuggestions = true"
-            @blur="handleBlur"
             placeholder="🔍 Поиск по всем сущностям..."
             class="global-search-input"
           >
           <button @click="goToSearch" class="search-btn">🔍</button>
-        </div>
-        
-        <!-- Подсказки поиска -->
-        <div v-if="showSuggestions && suggestions.length > 0" class="suggestions-dropdown">
-          <div 
-            v-for="suggestion in suggestions" 
-            :key="suggestion.id"
-            class="suggestion-item"
-            @mousedown.prevent="selectSuggestion(suggestion)"
-          >
-            <div class="suggestion-icon">{{ suggestion.icon }}</div>
-            <div class="suggestion-content">
-              <div class="suggestion-title">{{ suggestion.title }}</div>
-              <div class="suggestion-subtitle">{{ suggestion.subtitle }}</div>
-            </div>
-            <div class="suggestion-type">{{ suggestion.type }}</div>
-          </div>
         </div>
       </div>
       <div class="nav-links">
@@ -50,62 +30,14 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
 
 const router = useRouter()
-const API = 'http://localhost:8000/api'
-
 const searchQuery = ref('')
-const showSuggestions = ref(false)
-const suggestions = ref([])
-let debounceTimer = null
 
-// Функция для получения подсказок
-const fetchSuggestions = async (query) => {
-  if (!query.trim()) {
-    suggestions.value = []
-    return
-  }
-  
-  try {
-    const response = await axios.get(`${API}/global-search/suggestions/`, {
-      params: { q: query}
-    })
-    suggestions.value = response.data
-  } catch (error) {
-    console.error('Ошибка получения подсказок:', error)
-    suggestions.value = []
-  }
-}
-
-// Обработчик ввода с debounce
-const onSearchInput = () => {
-  if (debounceTimer) clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => {
-    fetchSuggestions(searchQuery.value)
-  }, 300)
-}
-
-// Выбор подсказки
-const selectSuggestion = (suggestion) => {
-  searchQuery.value = suggestion.searchValue
-  showSuggestions.value = false
-  router.push({ name: 'GlobalSearch', query: { q: suggestion.searchValue } })
-}
-
-// Закрытие подсказок
-const handleBlur = () => {
-  setTimeout(() => {
-    showSuggestions.value = false
-  }, 200)
-}
-
-// Переход к поиску
 const goToSearch = () => {
   if (searchQuery.value.trim()) {
-    showSuggestions.value = false
     router.push({ name: 'GlobalSearch', query: { q: searchQuery.value } })
   }
 }
@@ -121,6 +53,7 @@ const goToSearch = () => {
 body {
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   background: #f5f7fb;
+  padding-top: 70px; /* Отступ для фиксированного хэдера */
 }
 
 .navbar {
@@ -132,7 +65,12 @@ body {
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  position: relative;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
 }
 
 .nav-brand {
@@ -175,64 +113,6 @@ body {
   background: #16a085;
 }
 
-/* Стили для подсказок */
-.suggestions-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  max-height: 400px;
-  overflow-y: auto;
-  z-index: 1000;
-  margin-top: 8px;
-}
-
-.suggestion-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 15px;
-  cursor: pointer;
-  transition: background 0.2s;
-  border-bottom: 1px solid #eee;
-}
-
-.suggestion-item:hover {
-  background: #f0f0f0;
-}
-
-.suggestion-icon {
-  font-size: 1.2rem;
-  min-width: 30px;
-}
-
-.suggestion-content {
-  flex: 1;
-}
-
-.suggestion-title {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: #2c3e50;
-}
-
-.suggestion-subtitle {
-  font-size: 0.75rem;
-  color: #999;
-  margin-top: 2px;
-}
-
-.suggestion-type {
-  font-size: 0.7rem;
-  color: #1abc9c;
-  background: #e8f5e9;
-  padding: 2px 8px;
-  border-radius: 12px;
-}
-
 .nav-links {
   display: flex;
   gap: 1rem;
@@ -259,6 +139,10 @@ body {
 }
 
 @media (max-width: 768px) {
+  body {
+    padding-top: 120px; /* Увеличенный отступ для мобильных устройств */
+  }
+  
   .navbar {
     flex-direction: column;
     text-align: center;
