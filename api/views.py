@@ -84,29 +84,18 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
             'locations': []
         }
         
-        # Приводим поисковый запрос к нижнему регистру
         query_lower = query.lower()
-        
-        # Разбиваем запрос на отдельные слова для более точного поиска
         query_words = query_lower.split()
-        print(f"🔍 Ключевые слова: {query_words}")
         
-        # Поиск сотрудников
+        # Поиск сотрудников (остается без изменений)
         all_employees = Employee.objects.all()
         employees_found = []
         
         for emp in all_employees:
-            # Создаем строку для поиска (фамилия + имя + отчество)
             searchable = f"{emp.last_name} {emp.first_name} {emp.patronymic or ''}".lower()
-            
-            # Проверяем, содержит ли строка все ключевые слова
             match = all(word in searchable for word in query_words)
-            
             if match:
                 employees_found.append(emp)
-                print(f"✅ Найден сотрудник: {emp.last_name} {emp.first_name}")
-        
-        print(f"📊 Найдено сотрудников: {len(employees_found)}")
         
         for emp in employees_found:
             workplace = Workplace.objects.filter(employee=emp).first()
@@ -146,7 +135,7 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
                     'computer_type': computer.computer_type if computer else None,
                     'has_keyboard': computer.has_keyboard if computer else None,
                     'has_mouse': computer.has_mouse if computer else None,
-                    'monitors': [{'brand': m.brand} for m in computer.monitors.all()] if computer else [],
+                    'monitors': [{'brand': m.brand, 'id': m.id} for m in computer.monitors.all()] if computer else [],
                     'service_status': computer.service_status if computer else None
                 } if computer else None,
                 'ups': {
@@ -170,34 +159,6 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
                 } if mfp else None
             })
         
-        # Поиск рабочих мест
-        all_workplaces = Workplace.objects.all()
-        for wp in all_workplaces:
-            searchable = f"{wp.employee.last_name} {wp.employee.first_name} {wp.location or ''} {wp.city.name if wp.city else ''}".lower()
-            match = all(word in searchable for word in query_words)
-            
-            if match:
-                results['workplaces'].append({
-                    'id': wp.id,
-                    'employee_name': wp.employee.full_name,
-                    'location': wp.location,
-                    'city': wp.city.name if wp.city else None,
-                    'status': wp.status,
-                    'created_at': wp.created_at,
-                    'computer': {
-                        'asset_number': wp.computer.asset_number if wp.computer else None,
-                        'system_unit': wp.computer.system_unit if wp.computer else None
-                    } if wp.computer else None,
-                    'mfp': {
-                        'model': wp.mfp.model if wp.mfp else None,
-                        'ip_address': wp.mfp.ip_address if wp.mfp else None
-                    } if wp.mfp else None,
-                    'ups': {
-                        'model': wp.ups.model if wp.ups else None,
-                        'battery_replaced_at': wp.ups.battery_replaced_at if wp.ups else None
-                    } if wp.ups else None
-                })
-        
         # Поиск компьютеров
         all_computers = Computer.objects.all()
         for comp in all_computers:
@@ -216,7 +177,8 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
                     'has_mouse': comp.has_mouse,
                     'service_status': comp.service_status,
                     'needs_upgrade': comp.needs_upgrade,
-                    'monitors': [{'brand': m.brand} for m in comp.monitors.all()],
+                    'monitors': [{'brand': m.brand, 'id': m.id} for m in comp.monitors.all()],
+                    'monitors_detail': [{'brand': m.brand, 'id': m.id} for m in comp.monitors.all()],
                     'assigned_to': {
                         'id': workplace.employee.id if workplace else None,
                         'full_name': workplace.employee.full_name if workplace else None
@@ -264,7 +226,7 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
                     'status': ups.status,
                     'comment': ups.comment,
                     'battery_serial_number': ups.battery_serial_number,
-                    'battery_replaced_at': ups.battery_replaced_at,
+                    'battery_replaced_at': ups.battery_replaced_at,  # Это поле должно быть
                     'battery_history': [{
                         'id': bh.id,
                         'old_battery_serial': bh.old_battery_serial,
@@ -294,37 +256,6 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
                     'location': tv.location
                 })
         
-        # Поиск отделов
-        all_departments = Department.objects.all()
-        for dep in all_departments:
-            if query_lower in dep.name.lower():
-                employees_in_dep = Employee.objects.filter(department=dep)
-                results['departments'].append({
-                    'id': dep.id,
-                    'name': dep.name,
-                    'employees_count': employees_in_dep.count(),
-                    'employees': [{
-                        'id': e.id,
-                        'full_name': e.full_name
-                    } for e in employees_in_dep[:5]]
-                })
-        
-        # Поиск локаций
-        all_locations = Location.objects.all()
-        for loc in all_locations:
-            if query_lower in loc.name.lower():
-                workplaces_in_loc = Workplace.objects.filter(city=loc)
-                results['locations'].append({
-                    'id': loc.id,
-                    'name': loc.name,
-                    'workplaces_count': workplaces_in_loc.count(),
-                    'workplaces': [{
-                        'id': wp.id,
-                        'employee_name': wp.employee.full_name
-                    } for wp in workplaces_in_loc[:5]]
-                })
-        
-        print(f"✅ Результатов сотрудников: {len(results['employees'])}")
         return Response(results)
 
     @action(detail=False, methods=['get'])

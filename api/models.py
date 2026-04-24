@@ -169,7 +169,7 @@ class UPS(models.Model):
 
 class BatteryHistory(models.Model):
     """История замены аккумуляторов"""
-    ups = models.ForeignKey(UPS, on_delete=models.CASCADE, verbose_name="ИБП", related_name='battery_history')
+    ups = models.ForeignKey('UPS', on_delete=models.CASCADE, verbose_name="ИБП", related_name='battery_history')
     old_battery_serial = models.CharField(max_length=100, verbose_name="Извлеченный аккумулятор (серийный номер)", blank=True, null=True)
     new_battery_serial = models.CharField(max_length=100, verbose_name="Установленный аккумулятор (серийный номер)")
     replaced_at = models.DateField(auto_now_add=True, verbose_name="Дата замены")
@@ -180,6 +180,12 @@ class BatteryHistory(models.Model):
         verbose_name = "История замены АКБ"
         verbose_name_plural = "История замены АКБ"
         ordering = ['-replaced_at']
+    
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # При сохранении записи обновляем поле battery_replaced_at в UPS
+        self.ups.battery_replaced_at = self.replaced_at
+        self.ups.save()
     
     def __str__(self):
         return f"{self.ups} - замена АКБ от {self.replaced_at}"

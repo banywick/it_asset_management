@@ -107,16 +107,190 @@
         </div>
       </div>
 
-      <!-- Остальные категории (компьютеры, МФУ, ИБП, телевизоры) остаются без изменений -->
-      <!-- ... -->
+      <!-- Компьютеры -->
+      <div v-if="searchResults.computers?.length" class="result-category">
+        <div class="category-header">
+          <div class="category-title">
+            <span class="category-icon">🖥️</span>
+            <h2>Компьютеры</h2>
+            <span class="count">{{ searchResults.computers.length }}</span>
+          </div>
+        </div>
+        <div class="cards-grid">
+          <div v-for="comp in searchResults.computers" :key="comp.id" class="result-card">
+            <div class="card-header">
+              <div class="header-icon">💻</div>
+              <div class="header-info">
+                <div class="title">ОС №{{ comp.asset_number }}</div>
+                <div class="subtitle">{{ getComputerTypeText(comp.computer_type) }}</div>
+              </div>
+              <button @click="openEditModal('computer', comp)" class="edit-icon-btn" title="Редактировать">✏️</button>
+            </div>
+            <div class="card-content">
+              <div class="detail-item">
+                <span class="label">Системный блок:</span>
+                <span class="value">{{ comp.system_unit || 'Не указан' }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Мониторы:</span>
+                <span class="value">{{ comp.monitors?.map(m => m.brand).join(', ') || 'нет' }}</span>
+              </div>
+              <div 
+                v-if="comp.assigned_to" 
+                class="relation-section"
+                @click="openDetailsModal('employee', comp.assigned_to.id)"
+              >
+                <div class="relation-header">
+                  <span class="relation-icon">👤</span>
+                  <span class="relation-title">Закреплен за</span>
+                  <span class="relation-subtitle">{{ comp.assigned_to.full_name }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- МФУ -->
+      <div v-if="searchResults.mfps?.length" class="result-category">
+        <div class="category-header">
+          <div class="category-title">
+            <span class="category-icon">🖨️</span>
+            <h2>МФУ</h2>
+            <span class="count">{{ searchResults.mfps.length }}</span>
+          </div>
+        </div>
+        <div class="cards-grid">
+          <div v-for="mfp in searchResults.mfps" :key="mfp.id" class="result-card">
+            <div class="card-header">
+              <div class="header-icon">🖨️</div>
+              <div class="header-info">
+                <div class="title">ОС №{{ mfp.asset_number }}</div>
+                <div class="subtitle">{{ mfp.model }}</div>
+              </div>
+              <button @click="openEditModal('mfp', mfp)" class="edit-icon-btn" title="Редактировать">✏️</button>
+            </div>
+            <div class="card-content">
+              <div class="detail-item">
+                <span class="label">IP адрес:</span>
+                <span class="value">{{ mfp.ip_address || 'не указан' }}</span>
+              </div>
+              <div 
+                v-for="wp in mfp.used_in_workplaces" 
+                :key="wp.id"
+                class="relation-section"
+                @click="openDetailsModal('workplace', wp.id)"
+              >
+                <div class="relation-header">
+                  <span class="relation-icon">🏢</span>
+                  <span class="relation-title">Рабочее место</span>
+                  <span class="relation-subtitle">{{ wp.employee_name }}</span>
+                </div>
+                <div class="relation-city">{{ wp.city || 'Город не указан' }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ИБП -->
+      <div v-if="searchResults.ups?.length" class="result-category">
+        <div class="category-header">
+          <div class="category-title">
+            <span class="category-icon">🔋</span>
+            <h2>ИБП</h2>
+            <span class="count">{{ searchResults.ups.length }}</span>
+          </div>
+        </div>
+        <div class="cards-grid">
+          <div v-for="ups in searchResults.ups" :key="ups.id" class="result-card">
+            <div class="card-header">
+              <div class="header-icon">🔋</div>
+              <div class="header-info">
+                <div class="title">ОС №{{ ups.asset_number }}</div>
+                <div class="subtitle">{{ ups.model }}</div>
+              </div>
+              <button @click="openEditModal('ups', ups)" class="edit-icon-btn" title="Редактировать">✏️</button>
+            </div>
+            <div class="card-content">
+              <div class="detail-item">
+                <span class="label">Статус:</span>
+                <span :class="['status-badge', getUPSStatusClass(ups.status)]">
+                  {{ getUPSStatusText(ups.status) }}
+                </span>
+              </div>
+              <div class="detail-item">
+                <!-- <span class="label">Аккумулятор:</span>
+                <span class="value">{{ ups.battery_serial_number || 'не указан' }}</span> -->
+              </div>
+              <div class="detail-item">
+                <span class="label">Замена АКБ:</span>
+                <span class="value">{{ formatDate(ups.battery_replaced_at) || 'не заменялся' }}</span>
+              </div>
+              <div 
+                v-for="wp in ups.used_in_workplaces" 
+                :key="wp.id"
+                class="relation-section"
+                @click="openDetailsModal('workplace', wp.id)"
+              >
+                <div class="relation-header">
+                  <span class="relation-icon">🏢</span>
+                  <span class="relation-title">Рабочее место</span>
+                  <span class="relation-subtitle">{{ wp.employee_name }}</span>
+                </div>
+                <div class="relation-city">{{ wp.city || 'Город не указан' }}</div>
+              </div>
+              <div v-if="ups.battery_history?.length" class="history-preview">
+                <div class="history-title">📋 Последние замены АКБ:</div>
+                <div v-for="hist in ups.battery_history.slice(0, 2)" :key="hist.id" class="history-mini">
+                  {{ formatDate(hist.replaced_at) }}: {{ hist.new_battery_serial }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Телевизоры -->
+      <div v-if="searchResults.tvs?.length" class="result-category">
+        <div class="category-header">
+          <div class="category-title">
+            <span class="category-icon">📺</span>
+            <h2>Телевизоры</h2>
+            <span class="count">{{ searchResults.tvs.length }}</span>
+          </div>
+        </div>
+        <div class="cards-grid">
+          <div v-for="tv in searchResults.tvs" :key="tv.id" class="result-card">
+            <div class="card-header">
+              <div class="header-icon">📺</div>
+              <div class="header-info">
+                <div class="title">{{ tv.brand }}</div>
+                <div class="subtitle">{{ tv.size }}"</div>
+              </div>
+              <button @click="openEditModal('tv', tv)" class="edit-icon-btn" title="Редактировать">✏️</button>
+            </div>
+            <div class="card-content">
+              <div class="detail-item">
+                <span class="label">ОС №:</span>
+                <span class="value">{{ tv.asset_number || 'не определен' }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Место:</span>
+                <span class="value">{{ tv.location || 'не указано' }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Модальное окно для редактирования (с поиском отдела) -->
+    <!-- Модальное окно для редактирования -->
     <div v-if="showEditModal" class="modal" :class="{ 'modal-higher': showDetailsModal }">
       <div class="modal-content modal-large">
         <h3>✏️ Редактировать {{ getEntityTypeName() }}</h3>
         
-        <!-- Сотрудник с поиском отдела -->
+        <!-- Сотрудник -->
         <div v-if="editEntityType === 'employee'">
           <div class="form-group">
             <label>Фамилия:</label>
@@ -130,8 +304,6 @@
             <label>Отчество:</label>
             <input v-model="editData.patronymic" class="search-input">
           </div>
-          
-          <!-- Отдел с поиском -->
           <div class="form-group">
             <label>Отдел:</label>
             <div class="search-wrapper">
@@ -199,8 +371,85 @@
           </div>
         </div>
         
-        <!-- Остальные типы (МФУ, ИБП, телевизор, рабочее место) -->
-        <!-- ... -->
+        <!-- МФУ -->
+        <div v-if="editEntityType === 'mfp'">
+          <div class="form-group">
+            <label>Номер ОС:</label>
+            <input v-model="editData.asset_number" class="main-field">
+          </div>
+          <div class="form-group">
+            <label>Модель:</label>
+            <input v-model="editData.model" class="search-input">
+          </div>
+          <div class="form-group">
+            <label>IP адрес:</label>
+            <input v-model="editData.ip_address" class="search-input ip-input" placeholder="192.168.1.100">
+          </div>
+        </div>
+        
+        <!-- ИБП -->
+        <div v-if="editEntityType === 'ups'">
+          <div class="form-group">
+            <label>Номер ОС:</label>
+            <input v-model="editData.asset_number" class="main-field">
+          </div>
+          <div class="form-group">
+            <label>Модель:</label>
+            <input v-model="editData.model" class="search-input">
+          </div>
+          <div class="form-group">
+            <label>Статус:</label>
+            <select v-model="editData.status" class="search-input">
+              <option value="active">✅ Активен</option>
+              <option value="repair">🔧 В ремонте</option>
+              <option value="replaced">🔄 Заменен временно</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Комментарий:</label>
+            <textarea v-model="editData.comment" rows="3" class="textarea-field"></textarea>
+          </div>
+        </div>
+        
+        <!-- Телевизор -->
+        <div v-if="editEntityType === 'tv'">
+          <div class="form-group">
+            <label>Номер ОС:</label>
+            <input v-model="editData.asset_number" class="main-field">
+          </div>
+          <div class="form-group">
+            <label>Марка:</label>
+            <input v-model="editData.brand" class="search-input">
+          </div>
+          <div class="form-group">
+            <label>Диагональ:</label>
+            <input v-model="editData.size" type="number" step="0.1" class="search-input">
+          </div>
+          <div class="form-group">
+            <label>Место:</label>
+            <input v-model="editData.location" class="search-input">
+          </div>
+        </div>
+        
+        <!-- Рабочее место -->
+        <div v-if="editEntityType === 'workplace'">
+          <div class="form-group">
+            <label>Город:</label>
+            <select v-model="editData.city" class="search-input">
+              <option :value="null">Выберите город</option>
+              <option v-for="city in allLocations" :key="city.id" :value="city.id">{{ city.name }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Статус:</label>
+            <select v-model="editData.status" class="search-input">
+              <option value="active">✅ Активно</option>
+              <option value="inactive">❌ Неактивно</option>
+              <option value="maintenance">🔧 На обслуживании</option>
+              <option value="repair">⚠️ Требует ремонта</option>
+            </select>
+          </div>
+        </div>
         
         <div class="modal-buttons">
           <button @click="saveEdit" class="save-btn">💾 Сохранить</button>
@@ -268,8 +517,93 @@
           </div>
         </div>
         
-        <!-- Остальные типы детализации -->
-        <!-- ... -->
+        <!-- Детали компьютера -->
+        <div v-if="detailsType === 'computer' && detailsData" class="computer-details">
+          <div class="detail-row">
+            <span class="detail-label">🆔 ОС №:</span>
+            <span class="detail-value">{{ detailsData.asset_number }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">💻 Системный блок:</span>
+            <span class="detail-value">{{ detailsData.system_unit || 'Не указан' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">🖥️ Тип:</span>
+            <span class="detail-value">{{ getComputerTypeText(detailsData.computer_type) }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">🖥️ Мониторы:</span>
+            <span class="detail-value">{{ detailsData.monitors_detail?.map(m => m.brand).join(', ') || 'нет' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">⌨️ Периферия:</span>
+            <span class="detail-value">{{ detailsData.has_keyboard ? 'Клавиатура' : '' }} {{ detailsData.has_mouse ? 'Мышь' : '' }}</span>
+          </div>
+        </div>
+        
+              <!-- Детали ИБП -->
+        <div v-if="detailsType === 'ups' && detailsData" class="ups-details">
+          <div class="detail-row">
+            <span class="detail-label">🔋 Модель:</span>
+            <span class="detail-value">{{ detailsData.model }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">📊 Статус:</span>
+            <span :class="['status-badge', getUPSStatusClass(detailsData.status)]">
+              {{ getUPSStatusText(detailsData.status) }}
+            </span>
+          </div>
+          <div class="detail-row">
+            <!-- <span class="detail-label">🔧 Аккумулятор:</span>
+            <span class="detail-value">{{ detailsData.battery_serial_number || 'не указан' }}</span> -->
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">📅 Последняя замена АКБ:</span>
+            <span class="detail-value">
+              <span v-if="detailsData.battery_replaced_at" class="battery-date">
+                {{ formatDate(detailsData.battery_replaced_at) }}
+              </span>
+              <span v-else class="no-data">не заменялся</span>
+            </span>
+          </div>
+          <div v-if="detailsData.battery_history?.length" class="history-list">
+            <div class="history-title">📋 История замен:</div>
+            <div v-for="hist in detailsData.battery_history" :key="hist.id" class="history-item">
+              <div class="history-date">{{ formatDate(hist.replaced_at) }}</div>
+              <div class="history-change">
+                <span class="old-battery">📤 {{ hist.old_battery_serial || 'не указан' }}</span>
+                <span class="arrow">→</span>
+                <span class="new-battery">📥 {{ hist.new_battery_serial }}</span>
+              </div>
+              <div v-if="hist.performed_by" class="history-performer">👤 {{ hist.performed_by }}</div>
+              <div v-if="hist.comment" class="history-comment">💬 {{ hist.comment }}</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Детали МФУ -->
+        <div v-if="detailsType === 'mfp' && detailsData" class="mfp-details">
+          <div class="detail-row">
+            <span class="detail-label">📠 Модель:</span>
+            <span class="detail-value">{{ detailsData.model }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">🌐 IP адрес:</span>
+            <span class="detail-value">{{ detailsData.ip_address || 'не указан' }}</span>
+          </div>
+        </div>
+        
+        <!-- Детали сотрудника -->
+        <div v-if="detailsType === 'employee' && detailsData" class="employee-details">
+          <div class="detail-row">
+            <span class="detail-label">👤 ФИО:</span>
+            <span class="detail-value">{{ detailsData.last_name }} {{ detailsData.first_name }} {{ detailsData.patronymic || '' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">📍 Отдел:</span>
+            <span class="detail-value">{{ detailsData.department_name || 'Не указан' }}</span>
+          </div>
+        </div>
         
         <div class="modal-buttons">
           <button v-if="detailsData" @click="openEditFromDetails(detailsType, detailsData)" class="save-btn">✏️ Редактировать</button>
@@ -476,7 +810,7 @@ const openDetailsModal = async (type, id) => {
   }
 }
 
-// Открытие редактирования из деталей (закрывает окно деталей и открывает редактирование)
+// Открытие редактирования из деталей
 const openEditFromDetails = (type, data) => {
   // Закрываем окно детализации
   showDetailsModal.value = false
@@ -609,6 +943,7 @@ const performSearch = async () => {
     const response = await axios.get(`${API}/global-search/search/`, {
       params: { q: searchQuery.value }
     })
+    console.log('Результаты поиска:', response.data)
     searchResults.value = response.data
   } catch (error) {
     console.error('Ошибка поиска:', error)
