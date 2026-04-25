@@ -37,6 +37,78 @@
         <small class="field-hint">Формат: XXX.XXX.XXX.XXX (например: 10.10.29.25)</small>
       </div>
 
+      <!-- Новые поля -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>Номер кабинета:</label>
+          <input 
+            v-model="newMFP.cabinet_number" 
+            placeholder="Например: 305"
+            class="search-input"
+          >
+        </div>
+        
+        <div class="form-group">
+          <label>Серийный номер:</label>
+          <input 
+            v-model="newMFP.serial_number" 
+            placeholder="Серийный номер"
+            class="search-input"
+          >
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Логин:</label>
+          <input 
+            v-model="newMFP.login" 
+            placeholder="Логин для доступа"
+            class="search-input"
+          >
+        </div>
+        
+        <div class="form-group">
+          <label>Пароль:</label>
+          <input 
+            v-model="newMFP.password" 
+            placeholder="Пароль для доступа"
+            type="text"
+            class="search-input"
+          >
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>MAC адрес:</label>
+          <input 
+            v-model="newMFP.mac_address" 
+            placeholder="XX:XX:XX:XX:XX:XX"
+            class="search-input mac-input"
+          >
+          <small class="field-hint">Формат: XX:XX:XX:XX:XX:XX</small>
+        </div>
+        
+        <div class="form-group">
+          <label>Статус:</label>
+          <select v-model="newMFP.status" class="search-input">
+            <option value="operational">✅ В эксплуатации</option>
+            <option value="write_off">📦 На списание</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Примечания:</label>
+        <textarea 
+          v-model="newMFP.notes" 
+          placeholder="Дополнительная информация о МФУ..."
+          rows="3"
+          class="textarea-field"
+        ></textarea>
+      </div>
+
       <button @click="addMFP" class="submit-btn">💾 Добавить МФУ</button>
     </div>
 
@@ -46,22 +118,55 @@
       <div class="cards-grid">
         <div v-for="mfp in paginatedMFPs" :key="mfp.id" class="card">
           <div class="card-header">
-            <strong>ОС №{{ mfp.asset_number }}</strong>
+            <div class="mfp-title">
+              <strong>{{ mfp.model }}</strong>
+              <span class="asset-badge">ОС №{{ mfp.asset_number }}</span>
+            </div>
             <div class="card-actions">
+              <span :class="['status-badge-small', getMFPStatusClass(mfp.status)]">
+                {{ getMFPStatusText(mfp.status) }}
+              </span>
               <button @click="openEditModal(mfp)" class="edit-btn" title="Редактировать">✏️</button>
               <button @click="deleteMFP(mfp.id)" class="delete-btn" title="Удалить">🗑️</button>
             </div>
           </div>
           <div class="card-body">
-            <div class="info-row">
-              <span class="label">📠 Модель:</span>
-              <span class="value">{{ mfp.model }}</span>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="label">🌐 IP:</span>
+                <span class="value">{{ mfp.ip_address || 'не указан' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">🏢 Кабинет:</span>
+                <span class="value">{{ mfp.cabinet_number || 'не указан' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">🔢 Серийный номер:</span>
+                <span class="value">{{ mfp.serial_number || 'не указан' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">🔗 MAC адрес:</span>
+                <span class="value mac-value">{{ mfp.mac_address || 'не указан' }}</span>
+              </div>
+              <div v-if="mfp.login || mfp.password" class="info-item">
+                <span class="label">🔐 Доступ:</span>
+                <span class="value">
+                  <span v-if="mfp.login">Логин: {{ mfp.login }}</span>
+                  <span v-if="mfp.password"> / Пароль: {{ mfp.password }}</span>
+                </span>
+              </div>
+              <div v-if="mfp.notes" class="info-item full-width">
+                <span class="label">💬 Примечания:</span>
+                <span class="value notes">{{ mfp.notes }}</span>
+              </div>
             </div>
-            <div class="info-row">
-              <span class="label">🌐 IP адрес:</span>
-              <span class="value">
-                <code class="ip-address">{{ mfp.ip_address || 'не указан' }}</code>
-              </span>
+            <div class="compatible-cartridges" v-if="mfp.compatible_cartridges?.length">
+              <div class="label">🖨️ Совместимые картриджи:</div>
+              <div class="cartridges-list">
+                <span v-for="cart in mfp.compatible_cartridges" :key="cart.id" class="cartridge-tag">
+                  {{ cart.model }} (Минск: {{ cart.quantity_minsk }})
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -85,52 +190,64 @@
           <input v-model="editMFP.asset_number" class="main-field">
         </div>
         
-        <!-- Модель МФУ с поиском -->
         <div class="form-group">
           <label>Модель МФУ:</label>
-          <div class="search-wrapper">
-            <input 
-              type="text" 
-              v-model="modelSearch" 
-              @input="searchModels" 
-              @focus="searchModels"
-              placeholder="Введите модель МФУ..."
-              class="search-input"
-            >
-            <div v-if="modelSearchResults.length" class="search-results">
-              <div 
-                v-for="m in modelSearchResults" 
-                :key="m.id" 
-                @click="selectModel(m)"
-                class="search-result-item"
-              >
-                {{ m.model }}
-              </div>
-            </div>
-          </div>
-          <div v-if="selectedModel" class="selected-tag">
-            {{ selectedModel.model }}
-            <button @click="selectedModel = null" class="remove-btn">×</button>
-          </div>
+          <input v-model="editMFP.model" class="search-input">
         </div>
         
         <div class="form-group">
           <label>IP адрес:</label>
-          <input 
-            v-model="editMFP.ip_address" 
-            placeholder="192.168.1.100"
-            class="search-input ip-input"
-          >
+          <input v-model="editMFP.ip_address" class="search-input ip-input" placeholder="192.168.1.100">
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>Номер кабинета:</label>
+            <input v-model="editMFP.cabinet_number" class="search-input">
+          </div>
+          <div class="form-group">
+            <label>Серийный номер:</label>
+            <input v-model="editMFP.serial_number" class="search-input">
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>Логин:</label>
+            <input v-model="editMFP.login" class="search-input">
+          </div>
+          <div class="form-group">
+            <label>Пароль:</label>
+            <input v-model="editMFP.password" type="text" class="search-input">
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>MAC адрес:</label>
+            <input v-model="editMFP.mac_address" class="search-input mac-input" placeholder="XX:XX:XX:XX:XX:XX">
+          </div>
+          <div class="form-group">
+            <label>Статус:</label>
+            <select v-model="editMFP.status" class="search-input">
+              <option value="operational">✅ В эксплуатации</option>
+              <option value="write_off">📦 На списание</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Примечания:</label>
+          <textarea v-model="editMFP.notes" rows="3" class="textarea-field"></textarea>
         </div>
         
         <div class="modal-buttons">
           <button @click="updateMFP" class="save-btn">💾 Сохранить</button>
-          <button @click="closeEditModal" class="cancel-btn">Отмена</button>
+          <button @click="showEditModal = false" class="cancel-btn">Отмена</button>
         </div>
       </div>
     </div>
 
-    <!-- Модальное окно подтверждения удаления -->
     <ConfirmModal ref="confirmModal" />
   </div>
 </template>
@@ -156,7 +273,14 @@ const showEditModal = ref(false)
 const newMFP = ref({
   asset_number: 'не определен',
   model: '',
-  ip_address: ''
+  ip_address: '',
+  cabinet_number: '',
+  login: '',
+  password: '',
+  status: 'operational',
+  notes: '',
+  serial_number: '',
+  mac_address: ''
 })
 
 // Данные для редактирования
@@ -164,26 +288,17 @@ const editMFP = ref({
   id: null,
   asset_number: '',
   model: '',
-  ip_address: ''
+  ip_address: '',
+  cabinet_number: '',
+  login: '',
+  password: '',
+  status: 'operational',
+  notes: '',
+  serial_number: '',
+  mac_address: ''
 })
 
-// Поиск моделей
-const modelSearch = ref('')
-const modelSearchResults = ref([])
-const selectedModel = ref(null)
-
-// Список всех уникальных моделей для поиска
-const allModels = computed(() => {
-  const uniqueModels = []
-  const modelMap = new Map()
-  mfps.value.forEach(mfp => {
-    if (!modelMap.has(mfp.model)) {
-      modelMap.set(mfp.model, { id: mfp.id, model: mfp.model })
-      uniqueModels.push({ id: mfp.id, model: mfp.model })
-    }
-  })
-  return uniqueModels
-})
+const confirmModal = ref(null)
 
 // Пагинированные МФУ
 const paginatedMFPs = computed(() => {
@@ -207,6 +322,30 @@ const isValidIP = (ip) => {
     if (isNaN(num) || num < 0 || num > 255) return false
   }
   return true
+}
+
+// Валидация MAC адреса
+const isValidMAC = (mac) => {
+  if (!mac) return true
+  const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/
+  return macRegex.test(mac)
+}
+
+// Статусы МФУ
+const getMFPStatusText = (status) => {
+  const statusMap = {
+    'operational': 'В эксплуатации',
+    'write_off': 'На списание'
+  }
+  return statusMap[status] || status
+}
+
+const getMFPStatusClass = (status) => {
+  const classMap = {
+    'operational': 'status-operational',
+    'write_off': 'status-write-off'
+  }
+  return classMap[status] || ''
 }
 
 // Пагинация
@@ -233,25 +372,6 @@ const fetchAllData = async () => {
   }
 }
 
-// Поиск моделей для редактирования
-const searchModels = () => {
-  if (!modelSearch.value) {
-    modelSearchResults.value = []
-    return
-  }
-  modelSearchResults.value = allModels.value.filter(m => 
-    m.model.toLowerCase().includes(modelSearch.value.toLowerCase())
-  ).slice(0, 10)
-}
-
-// Выбор модели
-const selectModel = (model) => {
-  selectedModel.value = model
-  editMFP.value.model = model.model
-  modelSearch.value = ''
-  modelSearchResults.value = []
-}
-
 // Добавление МФУ
 const addMFP = async () => {
   if (!newMFP.value.model) {
@@ -264,11 +384,23 @@ const addMFP = async () => {
     return
   }
   
+  if (newMFP.value.mac_address && !isValidMAC(newMFP.value.mac_address)) {
+    showWarning('Пожалуйста, введите корректный MAC адрес (формат: XX:XX:XX:XX:XX:XX)')
+    return
+  }
+  
   try {
     const mfpData = {
       asset_number: newMFP.value.asset_number || 'не определен',
       model: newMFP.value.model,
-      ip_address: newMFP.value.ip_address || null
+      ip_address: newMFP.value.ip_address || null,
+      cabinet_number: newMFP.value.cabinet_number || null,
+      login: newMFP.value.login || null,
+      password: newMFP.value.password || null,
+      status: newMFP.value.status,
+      notes: newMFP.value.notes || null,
+      serial_number: newMFP.value.serial_number || null,
+      mac_address: newMFP.value.mac_address || null
     }
     
     await axios.post(`${API}/mfps/`, mfpData)
@@ -276,7 +408,14 @@ const addMFP = async () => {
     newMFP.value = {
       asset_number: 'не определен',
       model: '',
-      ip_address: ''
+      ip_address: '',
+      cabinet_number: '',
+      login: '',
+      password: '',
+      status: 'operational',
+      notes: '',
+      serial_number: '',
+      mac_address: ''
     }
     
     await fetchAllData()
@@ -294,26 +433,16 @@ const openEditModal = (mfp) => {
     id: mfp.id,
     asset_number: mfp.asset_number,
     model: mfp.model,
-    ip_address: mfp.ip_address || ''
+    ip_address: mfp.ip_address || '',
+    cabinet_number: mfp.cabinet_number || '',
+    login: mfp.login || '',
+    password: mfp.password || '',
+    status: mfp.status || 'operational',
+    notes: mfp.notes || '',
+    serial_number: mfp.serial_number || '',
+    mac_address: mfp.mac_address || ''
   }
-  selectedModel.value = { id: mfp.id, model: mfp.model }
-  modelSearch.value = ''
-  modelSearchResults.value = []
   showEditModal.value = true
-}
-
-// Закрытие модального окна редактирования
-const closeEditModal = () => {
-  showEditModal.value = false
-  editMFP.value = {
-    id: null,
-    asset_number: '',
-    model: '',
-    ip_address: ''
-  }
-  selectedModel.value = null
-  modelSearch.value = ''
-  modelSearchResults.value = []
 }
 
 // Обновление МФУ
@@ -328,15 +457,27 @@ const updateMFP = async () => {
     return
   }
   
+  if (editMFP.value.mac_address && !isValidMAC(editMFP.value.mac_address)) {
+    showWarning('Пожалуйста, введите корректный MAC адрес (формат: XX:XX:XX:XX:XX:XX)')
+    return
+  }
+  
   try {
     const mfpData = {
       asset_number: editMFP.value.asset_number,
       model: editMFP.value.model,
-      ip_address: editMFP.value.ip_address || null
+      ip_address: editMFP.value.ip_address || null,
+      cabinet_number: editMFP.value.cabinet_number || null,
+      login: editMFP.value.login || null,
+      password: editMFP.value.password || null,
+      status: editMFP.value.status,
+      notes: editMFP.value.notes || null,
+      serial_number: editMFP.value.serial_number || null,
+      mac_address: editMFP.value.mac_address || null
     }
     
     await axios.put(`${API}/mfps/${editMFP.value.id}/`, mfpData)
-    closeEditModal()
+    showEditModal.value = false
     await fetchAllData()
     showSuccess('МФУ успешно обновлено!')
   } catch (error) {
@@ -378,6 +519,7 @@ onMounted(() => {
 .page {
   max-width: 1400px;
   margin: 0 auto;
+  padding: 1rem;
 }
 
 h1 {
@@ -463,63 +605,26 @@ h1 {
   box-shadow: 0 0 0 3px rgba(26, 188, 156, 0.1);
 }
 
-.ip-input {
-  font-family: 'Courier New', monospace;
-}
-
-.search-wrapper {
-  position: relative;
-}
-
-.search-results {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: white;
+.textarea-field {
+  width: 100%;
+  padding: 12px 15px;
   border: 1px solid #ddd;
   border-radius: 8px;
-  max-height: 250px;
-  overflow-y: auto;
-  z-index: 1000;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  font-size: 1rem;
+  font-family: inherit;
+  resize: vertical;
+  line-height: 1.5;
 }
 
-.search-result-item {
-  padding: 12px 15px;
-  cursor: pointer;
-  border-bottom: 1px solid #eee;
-  transition: background 0.2s;
+.textarea-field:focus {
+  outline: none;
+  border-color: #1abc9c;
+  box-shadow: 0 0 0 3px rgba(26, 188, 156, 0.1);
 }
 
-.search-result-item:hover {
-  background: #f0f0f0;
-}
-
-.selected-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: #e8f5e9;
-  padding: 8px 14px;
-  border-radius: 20px;
-  font-size: 0.95rem;
-  font-weight: 500;
-  margin-top: 8px;
-}
-
-.remove-btn {
-  background: none;
-  border: none;
-  font-size: 1.3rem;
-  cursor: pointer;
-  color: #999;
-  padding: 0 5px;
-  line-height: 1;
-}
-
-.remove-btn:hover {
-  color: #e74c3c;
+.ip-input, .mac-input {
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.5px;
 }
 
 .submit-btn {
@@ -555,20 +660,8 @@ h1 {
 
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: 1rem;
-}
-
-@media (max-width: 1000px) {
-  .cards-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 600px) {
-  .cards-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 .card {
@@ -591,16 +684,53 @@ h1 {
   padding: 12px 15px;
   background: rgba(26, 188, 156, 0.1);
   border-bottom: 1px solid rgba(0,0,0,0.05);
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.card-header strong {
+.mfp-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mfp-title strong {
   font-size: 1rem;
   color: #2c3e50;
+}
+
+.asset-badge {
+  background: #3498db;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
 }
 
 .card-actions {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.status-badge-small {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.status-operational {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-write-off {
+  background: #f8d7da;
+  color: #721c24;
 }
 
 .edit-btn, .delete-btn {
@@ -635,32 +765,71 @@ h1 {
   padding: 12px 15px;
 }
 
-.info-row {
-  margin-bottom: 8px;
-  font-size: 0.85rem;
-  line-height: 1.4;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
-.label {
+.info-item {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 0.8rem;
+}
+
+.info-item.full-width {
+  grid-column: span 2;
+}
+
+.info-item .label {
   font-weight: 600;
   color: #666;
-  min-width: 80px;
-  flex-shrink: 0;
+  min-width: 70px;
 }
 
-.value {
+.info-item .value {
   color: #333;
+  word-break: break-all;
 }
 
-.ip-address {
-  background: #f0f0f0;
-  padding: 2px 6px;
-  border-radius: 4px;
+.mac-value {
   font-family: 'Courier New', monospace;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+}
+
+.value.notes {
+  font-style: italic;
+  color: #e67e22;
+}
+
+.compatible-cartridges {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #eee;
+}
+
+.compatible-cartridges .label {
+  font-weight: 600;
+  color: #666;
+  font-size: 0.75rem;
+  margin-bottom: 6px;
+}
+
+.cartridges-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cartridge-tag {
+  background: #e0e0e0;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  color: #555;
 }
 
 .pagination {
@@ -715,8 +884,10 @@ h1 {
   padding: 2rem;
   border-radius: 16px;
   width: 90%;
-  max-width: 500px;
+  max-width: 600px;
   box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  max-height: 80vh;
+  overflow-y: auto;
 }
 
 .modal-large {
@@ -724,17 +895,8 @@ h1 {
 }
 
 .modal-content h3 {
-  margin-bottom: 1.2rem;
+  margin-bottom: 0.5rem;
   color: #2c3e50;
-}
-
-.modal-content input, .modal-content select {
-  width: 100%;
-  margin-bottom: 1rem;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 1rem;
 }
 
 .modal-buttons {
@@ -751,7 +913,6 @@ h1 {
   padding: 10px 20px;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 0.95rem;
 }
 
 .save-btn:hover {
@@ -765,7 +926,6 @@ h1 {
   padding: 10px 20px;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 0.95rem;
 }
 
 .cancel-btn:hover {
@@ -773,6 +933,18 @@ h1 {
 }
 
 @media (max-width: 768px) {
+  .cards-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .info-item.full-width {
+    grid-column: span 1;
+  }
+  
   .form-row {
     flex-direction: column;
   }
@@ -786,8 +958,14 @@ h1 {
     margin: 1rem;
   }
   
-  .pagination {
-    flex-wrap: wrap;
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .card-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 </style>

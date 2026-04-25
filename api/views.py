@@ -1,5 +1,5 @@
 from rest_framework import viewsets
-from .models import Department, Employee, Workplace, Computer, Monitor, TV, MFP, UPS
+from .models import *
 from .serializers import *
 from django.db.models import Q
 from rest_framework.decorators import action
@@ -69,6 +69,7 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
                 'mfps': [],
                 'tvs': [],
                 'ups': [],
+                'cartridges': [],
                 'departments': [],
                 'locations': []
             })
@@ -80,12 +81,16 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
             'mfps': [],
             'tvs': [],
             'ups': [],
+            'cartridges': [],
             'departments': [],
             'locations': []
         }
         
         query_lower = query.lower()
         query_words = query_lower.split()
+
+
+
         
         # Поиск сотрудников (остается без изменений)
         all_employees = Employee.objects.all()
@@ -158,6 +163,28 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
                     'ip_address': mfp.ip_address if mfp else None
                 } if mfp else None
             })
+
+
+        # Поиск картриджей
+        all_cartridges = Cartridge.objects.all()
+        for cart in all_cartridges:
+            searchable = f"{cart.model}".lower()
+            match = all(word in searchable for word in query_words)
+            
+            if match:
+                results['cartridges'].append({
+                    'id': cart.id,
+                    'model': cart.model,
+                    'quantity_minsk': cart.quantity_minsk,
+                    'quantity_machulishchi': cart.quantity_machulishchi,
+                    'compatible_mfps_detail': [{
+                        'id': m.id,
+                        'model': m.model,
+                        'asset_number': m.asset_number
+                    } for m in cart.compatible_mfps.all()],
+                    'total_quantity': cart.quantity_minsk + cart.quantity_machulishchi
+                })
+        
         
         # Поиск компьютеров
         all_computers = Computer.objects.all()
@@ -192,21 +219,36 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
         # Поиск МФУ
         all_mfps = MFP.objects.all()
         for mfp in all_mfps:
-            searchable = f"{mfp.asset_number} {mfp.model} {mfp.ip_address or ''}".lower()
+            searchable = f"{mfp.asset_number} {mfp.model} {mfp.ip_address or ''} {mfp.cabinet_number or ''} {mfp.serial_number or ''} {mfp.mac_address or ''}".lower()
             match = all(word in searchable for word in query_words)
             
             if match:
                 workplaces_with_mfp = Workplace.objects.filter(mfp=mfp)
+                # Получаем совместимые картриджи
+                compatible_cartridges = Cartridge.objects.filter(compatible_mfps=mfp)
+                
                 results['mfps'].append({
                     'id': mfp.id,
                     'asset_number': mfp.asset_number,
                     'model': mfp.model,
                     'ip_address': mfp.ip_address,
+                    'cabinet_number': mfp.cabinet_number,
+                    'login': mfp.login,
+                    'password': mfp.password,
+                    'status': mfp.status,
+                    'notes': mfp.notes,
+                    'serial_number': mfp.serial_number,
+                    'mac_address': mfp.mac_address,
                     'used_in_workplaces': [{
                         'id': wp.id,
                         'employee_name': wp.employee.full_name,
                         'city': wp.city.name if wp.city else None
-                    } for wp in workplaces_with_mfp]
+                    } for wp in workplaces_with_mfp],
+                    'compatible_cartridges': [{
+                        'id': c.id,
+                        'model': c.model,
+                        'quantity_minsk': c.quantity_minsk
+                    } for c in compatible_cartridges]
                 })
         
         # Поиск ИБП
@@ -268,15 +310,11 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
             return Response([])
         
         suggestions = []
-        
-        # Приводим поисковый запрос к нижнему регистру для сравнения
         query_lower = query.lower()
         
-        # Поиск сотрудников - ищем по нижнему регистру
+        # Поиск сотрудников
         employees = Employee.objects.all()
-        
         for emp in employees:
-            # Проверяем совпадение вручную (без учета регистра)
             if (query_lower in emp.last_name.lower() or 
                 query_lower in emp.first_name.lower() or 
                 (emp.patronymic and query_lower in emp.patronymic.lower())):
@@ -288,10 +326,8 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
                     'type': 'Сотрудник',
                     'searchValue': f"{emp.last_name} {emp.first_name}"
                 })
-        
-        # Ограничиваем количество
-        suggestions = suggestions[:5]
-        print(f"Найдено сотрудников для подсказок: {len(suggestions)}")
+                if len(suggestions) >= 15:
+                    break
         
         # Поиск компьютеров
         computers = Computer.objects.all()
@@ -341,11 +377,26 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
                 if len(suggestions) >= 15:
                     break
         
+        # Поиск картриджей
+        cartridges = Cartridge.objects.all()
+        for cart in cartridges:
+            if query_lower in cart.model.lower():
+                suggestions.append({
+                    'id': f'cart_{cart.id}',
+                    'icon': '🖨️',
+                    'title': cart.model,
+                    'subtitle': f"Картридж, остаток в Минске: {cart.quantity_minsk} шт.",
+                    'type': 'Картридж',
+                    'searchValue': cart.model
+                })
+                if len(suggestions) >= 15:
+                    break
+        
         # Поиск телевизоров
         tvs = TV.objects.all()
         for tv in tvs:
-            if ((tv.asset_number and query_lower in tv.asset_number.lower()) or 
-                query_lower in tv.brand.lower()):
+            if (query_lower in tv.brand.lower() or 
+                (tv.asset_number and query_lower in tv.asset_number.lower())):
                 suggestions.append({
                     'id': f'tv_{tv.id}',
                     'icon': '📺',
@@ -365,7 +416,7 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
                     'id': f'dep_{dep.id}',
                     'icon': '📁',
                     'title': dep.name,
-                    'subtitle': f'Отдел',
+                    'subtitle': 'Отдел',
                     'type': 'Отдел',
                     'searchValue': dep.name
                 })
@@ -380,7 +431,7 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
                     'id': f'loc_{loc.id}',
                     'icon': '🏙️',
                     'title': loc.name,
-                    'subtitle': f'Локация',
+                    'subtitle': 'Локация',
                     'type': 'Локация',
                     'searchValue': loc.name
                 })
@@ -388,5 +439,15 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
                     break
         
         return Response(suggestions[:15])
-        
+            
 
+
+
+class CartridgeViewSet(viewsets.ModelViewSet):
+    queryset = Cartridge.objects.all()
+    serializer_class = CartridgeSerializer
+    filterset_fields = ['compatible_mfps']
+
+class CartridgeMovementViewSet(viewsets.ModelViewSet):
+    queryset = CartridgeMovement.objects.all()
+    serializer_class = CartridgeMovementSerializer

@@ -21,11 +21,6 @@ class TVSerializer(serializers.ModelSerializer):
         model = TV
         fields = '__all__'
 
-class MFPSerializer(serializers.ModelSerializer):
-    
-    class Meta:
-        model = MFP
-        fields = '__all__'
 
 class BatteryHistorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -67,6 +62,24 @@ class ComputerSerializer(serializers.ModelSerializer):
         model = Computer
         fields = '__all__'
 
+
+class MFPSerializer(serializers.ModelSerializer):
+    department_name = serializers.ReadOnlyField(source='department.name')
+    compatible_cartridges = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    
+    class Meta:
+        model = MFP
+        fields = '__all__'
+    
+    def get_compatible_cartridges(self, obj):
+        cartridges = Cartridge.objects.filter(compatible_mfps=obj)
+        return [{
+            'id': c.id,
+            'model': c.model,
+            'quantity_minsk': c.quantity_minsk,
+            'quantity_machulishchi': c.quantity_machulishchi
+        } for c in cartridges]
         
 class WorkplaceSerializer(serializers.ModelSerializer):
     employee_name = serializers.ReadOnlyField(source='employee.full_name')
@@ -80,3 +93,26 @@ class WorkplaceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Workplace
         fields = '__all__'
+
+class CartridgeSerializer(serializers.ModelSerializer):
+    compatible_mfps_detail = serializers.SerializerMethodField()
+    total_quantity = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Cartridge
+        fields = '__all__'
+    
+    def get_compatible_mfps_detail(self, obj):
+        return [{'id': m.id, 'model': m.model, 'asset_number': m.asset_number} for m in obj.compatible_mfps.all()]
+    
+    def get_total_quantity(self, obj):
+        return obj.quantity_minsk + obj.quantity_machulishchi
+
+class CartridgeMovementSerializer(serializers.ModelSerializer):
+    cartridge_name = serializers.ReadOnlyField(source='cartridge.name')
+    cartridge_model = serializers.ReadOnlyField(source='cartridge.model')
+    
+    class Meta:
+        model = CartridgeMovement
+        fields = '__all__'
+

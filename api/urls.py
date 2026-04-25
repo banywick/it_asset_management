@@ -14,6 +14,8 @@ router.register(r'ups', UPSViewSet)
 router.register(r'locations', LocationViewSet)
 router.register(r'battery-history', BatteryHistoryViewSet)
 router.register(r'global-search', GlobalSearchViewSet, basename='global-search')
+router.register(r'cartridges', CartridgeViewSet)
+router.register(r'cartridge-movements', CartridgeMovementViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

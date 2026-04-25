@@ -41,7 +41,6 @@
             </div>
             
             <div class="card-content">
-              <!-- Только рабочее место -->
               <div 
                 v-if="emp.workplace" 
                 class="relation-section"
@@ -91,7 +90,6 @@
                 <span class="label">Мониторы:</span>
                 <span class="value">{{ comp.monitors?.map(m => m.brand).join(', ') || 'нет' }}</span>
               </div>
-              <!-- Рабочее место где используется компьютер -->
               <div 
                 v-if="comp.workplace" 
                 class="relation-section"
@@ -109,48 +107,85 @@
         </div>
       </div>
 
-      <!-- МФУ -->
-      <div v-if="searchResults.mfps?.length" class="result-category">
-        <div class="category-header">
-          <div class="category-title">
-            <span class="category-icon">🖨️</span>
-            <h2>МФУ</h2>
-            <span class="count">{{ searchResults.mfps.length }}</span>
-          </div>
+     <!-- МФУ -->
+    <div v-if="searchResults.mfps?.length" class="result-category">
+      <div class="category-header">
+        <div class="category-title">
+          <span class="category-icon">🖨️</span>
+          <h2>МФУ</h2>
+          <span class="count">{{ searchResults.mfps.length }}</span>
         </div>
-        <div class="cards-grid">
-          <div v-for="mfp in searchResults.mfps" :key="mfp.id" class="result-card">
-            <div class="card-header">
-              <div class="header-icon">🖨️</div>
-              <div class="header-info">
-                <div class="title">ОС №{{ mfp.asset_number }}</div>
-                <div class="subtitle">{{ mfp.model }}</div>
-              </div>
+      </div>
+      <div class="cards-grid">
+        <div v-for="mfp in searchResults.mfps" :key="mfp.id" class="result-card mfp-card">
+          <div class="card-header">
+            <div class="header-icon">🖨️</div>
+            <div class="header-info">
+              <div class="title">{{ mfp.model }}</div>
+              <div class="subtitle">ОС №{{ mfp.asset_number }}</div>
+            </div>
+            <div class="card-actions">
+              <span :class="['status-badge-small', getMFPStatusClass(mfp.status)]">
+                {{ getMFPStatusText(mfp.status) }}
+              </span>
               <button @click="openEditModal('mfp', mfp)" class="edit-icon-btn" title="Редактировать">✏️</button>
             </div>
-            <div class="card-content">
-              <div class="detail-item">
-                <span class="label">IP адрес:</span>
+          </div>
+          <div class="card-content">
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="label">🌐 IP:</span>
                 <span class="value">{{ mfp.ip_address || 'не указан' }}</span>
               </div>
-              <!-- Рабочие места где используется МФУ -->
-              <div 
-                v-for="wp in mfp.used_in_workplaces" 
-                :key="wp.id"
-                class="relation-section"
-                @click="openWorkplaceDetails(wp.id)"
-              >
-                <div class="relation-header">
-                  <span class="relation-icon">🏢</span>
-                  <span class="relation-title">Рабочее место</span>
-                  <span class="relation-subtitle">{{ wp.employee_name }}</span>
-                </div>
-                <div class="relation-city">{{ wp.city || 'Город не указан' }}</div>
+              <div class="info-item">
+                <span class="label">🏢 Кабинет:</span>
+                <span class="value">{{ mfp.cabinet_number || 'не указан' }}</span>
               </div>
+              <div class="info-item">
+                <span class="label">🔢 Серийный номер:</span>
+                <span class="value">{{ mfp.serial_number || 'не указан' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">🔗 MAC адрес:</span>
+                <span class="value mac-value">{{ mfp.mac_address || 'не указан' }}</span>
+              </div>
+              <div v-if="mfp.login || mfp.password" class="info-item">
+                <span class="label">🔐 Доступ:</span>
+                <span class="value">
+                  <span v-if="mfp.login">Логин: {{ mfp.login }}</span>
+                  <span v-if="mfp.password"> / Пароль: {{ mfp.password }}</span>
+                </span>
+              </div>
+              <div v-if="mfp.notes" class="info-item full-width">
+                <span class="label">💬 Примечания:</span>
+                <span class="value notes">{{ mfp.notes }}</span>
+              </div>
+            </div>
+            <div class="compatible-cartridges" v-if="mfp.compatible_cartridges?.length">
+              <div class="label">🖨️ Совместимые картриджи:</div>
+              <div class="cartridges-list">
+                <span v-for="cart in mfp.compatible_cartridges" :key="cart.id" class="cartridge-tag">
+                  {{ cart.model }} (Минск: {{ cart.quantity_minsk }})
+                </span>
+              </div>
+            </div>
+            <div 
+              v-for="wp in mfp.used_in_workplaces" 
+              :key="wp.id"
+              class="relation-section"
+              @click="openWorkplaceDetails(wp.id)"
+            >
+              <div class="relation-header">
+                <span class="relation-icon">🏢</span>
+                <span class="relation-title">Рабочее место</span>
+                <span class="relation-subtitle">{{ wp.employee_name }}</span>
+              </div>
+              <div class="relation-city">{{ wp.city || 'Город не указан' }}</div>
             </div>
           </div>
         </div>
       </div>
+    </div>
 
       <!-- ИБП -->
       <div v-if="searchResults.ups?.length" class="result-category">
@@ -185,14 +220,12 @@
                 <span class="label">Аккумулятор:</span>
                 <span class="value">{{ ups.battery_serial_number || 'не указан' }}</span>
               </div>
-              <!-- История замен -->
               <div v-if="ups.battery_history?.length" class="history-preview">
                 <div class="history-title">📋 Последние замены АКБ:</div>
                 <div v-for="hist in ups.battery_history.slice(0, 2)" :key="hist.id" class="history-mini">
                   {{ formatDate(hist.replaced_at) }}: {{ hist.new_battery_serial }}
                 </div>
               </div>
-              <!-- Рабочие места где используется ИБП -->
               <div 
                 v-for="wp in ups.used_in_workplaces" 
                 :key="wp.id"
@@ -205,6 +238,53 @@
                   <span class="relation-subtitle">{{ wp.employee_name }}</span>
                 </div>
                 <div class="relation-city">{{ wp.city || 'Город не указан' }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Картриджи -->
+      <div v-if="searchResults.cartridges?.length" class="result-category">
+        <div class="category-header">
+          <div class="category-title">
+            <span class="category-icon">🖨️</span>
+            <h2>Картриджи</h2>
+            <span class="count">{{ searchResults.cartridges.length }}</span>
+          </div>
+        </div>
+        <div class="cards-grid">
+          <div v-for="cart in searchResults.cartridges" :key="cart.id" class="result-card cartridge-card">
+            <div class="card-header">
+              <div class="header-icon">🖨️</div>
+              <div class="header-info">
+                <div class="title">{{ cart.model }}</div>
+                <div class="subtitle">Картридж</div>
+              </div>
+              <div class="card-actions">
+                <button @click="openTransferModal(cart)" class="transfer-icon-btn" title="Переместить в Мачулищи">🚚</button>
+                <button @click="openEditModal('cartridge', cart)" class="edit-icon-btn" title="Редактировать">✏️</button>
+                <button @click="deleteCartridge(cart.id)" class="delete-icon-btn" title="Удалить">🗑️</button>
+              </div>
+            </div>
+            <div class="card-content">
+              <div class="quantity-row">
+                <span class="quantity-badge minsk">🏙️ Минск: {{ cart.quantity_minsk }}</span>
+                <span class="quantity-badge machulishchi">📍 Мачулищи: {{ cart.quantity_machulishchi }}</span>
+                <span class="quantity-badge total">📊 Всего: {{ cart.total_quantity }}</span>
+              </div>
+              <div class="compatible-mfps">
+                <div class="label">🖨️ Совместимые МФУ:</div>
+                <div class="mfps-list">
+                  <span v-for="mfp in cart.compatible_mfps_detail" :key="mfp.id" class="mfp-tag">
+                    {{ mfp.model }}
+                  </span>
+                  <span v-if="!cart.compatible_mfps_detail?.length" class="no-data">нет</span>
+                </div>
+              </div>
+              <div class="detail-item">
+                <span class="label">📦 Доступно для выдачи:</span>
+                <span class="value">{{ cart.quantity_minsk }} шт.</span>
               </div>
             </div>
           </div>
@@ -246,7 +326,7 @@
     </div>
 
     <!-- Модальное окно детализации рабочего места -->
-    <div v-if="showWorkplaceModal" class="modal" :class="{ 'modal-higher': showEditModal || showUPSServiceModal }">
+    <div v-if="showWorkplaceModal" class="modal" :class="{ 'modal-higher': showEditModal || showUPSServiceModal || showTransferModal || showWorkplaceFieldModal }">
       <div class="modal-content modal-large">
         <h3>🏢 Детали рабочего места</h3>
         <p class="modal-subtitle">Сотрудник: <strong>{{ workplaceDetails?.employee_name }}</strong></p>
@@ -256,18 +336,25 @@
             <span class="detail-label">👤 Отдел:</span>
             <span class="detail-value">{{ workplaceDetails?.department_name || 'Не указан' }}</span>
           </div>
-          <div class="detail-row">
+          
+          <div class="detail-row clickable-row" @click="openWorkplaceFieldEdit('city')">
             <span class="detail-label">🏙️ Город:</span>
-            <span class="detail-value">{{ workplaceDetails?.city_name || 'Не указан' }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">📊 Статус:</span>
-            <span :class="['status-badge', getWorkplaceStatusClass(workplaceDetails?.status)]">
-              {{ getWorkplaceStatusText(workplaceDetails?.status) }}
+            <span class="detail-value">
+              {{ workplaceDetails?.city_name || 'Не указан' }}
             </span>
+            <span class="edit-hint-small">✏️</span>
           </div>
           
-          <!-- Компьютер -->
+          <div class="detail-row clickable-row" @click="openWorkplaceFieldEdit('status')">
+            <span class="detail-label">📊 Статус:</span>
+            <span class="detail-value">
+              <span :class="['status-badge', getWorkplaceStatusClass(workplaceDetails?.status)]">
+                {{ getWorkplaceStatusText(workplaceDetails?.status) }}
+              </span>
+            </span>
+            <span class="edit-hint-small">✏️</span>
+          </div>
+          
           <div v-if="workplaceDetails?.computer_detail" class="sub-entity" @click.stop="openEditFromWorkplace('computer', workplaceDetails.computer_detail.id)">
             <div class="sub-entity-header">
               <span>🖥️ Компьютер</span>
@@ -279,7 +366,6 @@
             </div>
           </div>
           
-          <!-- МФУ -->
           <div v-if="workplaceDetails?.mfp_detail" class="sub-entity" @click.stop="openEditFromWorkplace('mfp', workplaceDetails.mfp_detail.id)">
             <div class="sub-entity-header">
               <span>🖨️ МФУ</span>
@@ -291,7 +377,6 @@
             </div>
           </div>
           
-          <!-- ИБП с кнопкой обслуживания -->
           <div v-if="workplaceDetails?.ups_detail" class="sub-entity">
             <div class="sub-entity-header">
               <span>🔋 ИБП</span>
@@ -302,13 +387,50 @@
             </div>
             <div class="sub-entity-details">
               <div>{{ workplaceDetails.ups_detail.model }}</div>
-              <!-- <div class="small">АКБ заменён: {{ formatDate(workplaceDetails.ups_detail.battery_replaced_at) || 'не заменялся' }}</div> -->
+              <div class="small">АКБ заменён: {{ formatDate(workplaceDetails.ups_detail.battery_replaced_at) || 'не заменялся' }}</div>
             </div>
           </div>
         </div>
         
         <div class="modal-buttons">
           <button @click="closeWorkplaceModal" class="cancel-btn">Закрыть</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно редактирования поля рабочего места -->
+    <div v-if="showWorkplaceFieldModal" class="modal" :class="{ 'modal-higher': true }">
+      <div class="modal-content">
+        <h3>✏️ Редактировать {{ editFieldTitle }}</h3>
+        <p class="modal-subtitle">Рабочее место: <strong>{{ workplaceDetails?.employee_name }}</strong></p>
+        
+        <div v-if="editFieldType === 'city'">
+          <div class="form-group">
+            <label>Город:</label>
+            <select v-model="editCityValue" class="search-input">
+              <option :value="null">Выберите город</option>
+              <option v-for="city in allLocations" :key="city.id" :value="city.id">
+                {{ city.name }}
+              </option>
+            </select>
+          </div>
+        </div>
+        
+        <div v-if="editFieldType === 'status'">
+          <div class="form-group">
+            <label>Статус:</label>
+            <select v-model="editStatusValue" class="search-input">
+              <option value="active">✅ Активно</option>
+              <option value="inactive">❌ Неактивно</option>
+              <option value="maintenance">🔧 На обслуживании</option>
+              <option value="repair">⚠️ Требует ремонта</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="modal-buttons">
+          <button @click="saveWorkplaceField" class="save-btn">💾 Сохранить</button>
+          <button @click="showWorkplaceFieldModal = false" class="cancel-btn">Отмена</button>
         </div>
       </div>
     </div>
@@ -369,8 +491,36 @@
       </div>
     </div>
 
+    <!-- Модальное окно перемещения картриджа -->
+    <div v-if="showTransferModal" class="modal" :class="{ 'modal-higher': true }">
+      <div class="modal-content">
+        <h3>🚚 Перемещение картриджей в Мачулищи</h3>
+        <p class="modal-subtitle">Картридж: <strong>{{ transferCartridge?.model }}</strong></p>
+        
+        <div class="form-group">
+          <label>Доступно в Минске:</label>
+          <div class="available-stock">{{ transferCartridge?.quantity_minsk }} шт.</div>
+        </div>
+        
+        <div class="form-group">
+          <label>Количество для перемещения:</label>
+          <input v-model="transferQuantity" type="number" min="1" :max="transferCartridge?.quantity_minsk" class="search-input">
+        </div>
+        
+        <div class="form-group">
+          <label>Комментарий:</label>
+          <textarea v-model="transferComment" placeholder="Причина перемещения..." rows="2" class="textarea-field"></textarea>
+        </div>
+        
+        <div class="modal-buttons">
+          <button @click="processTransfer" class="save-btn">✅ Переместить</button>
+          <button @click="showTransferModal = false" class="cancel-btn">Отмена</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Модальное окно для редактирования -->
-    <div v-if="showEditModal" class="modal" :class="{ 'modal-higher': showWorkplaceModal || showUPSServiceModal }">
+    <div v-if="showEditModal" class="modal" :class="{ 'modal-higher': showWorkplaceModal || showUPSServiceModal || showTransferModal || showWorkplaceFieldModal }">
       <div class="modal-content modal-large">
         <h3>✏️ Редактировать {{ getEntityTypeName() }}</h3>
         
@@ -469,6 +619,43 @@
             <label>IP адрес:</label>
             <input v-model="editData.ip_address" class="search-input ip-input" placeholder="192.168.1.100">
           </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Номер кабинета:</label>
+              <input v-model="editData.cabinet_number" class="search-input">
+            </div>
+            <div class="form-group">
+              <label>Серийный номер:</label>
+              <input v-model="editData.serial_number" class="search-input">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Логин:</label>
+              <input v-model="editData.login" class="search-input">
+            </div>
+            <div class="form-group">
+              <label>Пароль:</label>
+              <input v-model="editData.password" type="text" class="search-input">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>MAC адрес:</label>
+              <input v-model="editData.mac_address" class="search-input mac-input" placeholder="XX:XX:XX:XX:XX:XX">
+            </div>
+            <div class="form-group">
+              <label>Статус:</label>
+              <select v-model="editData.status" class="search-input">
+                <option value="operational">✅ В эксплуатации</option>
+                <option value="write_off">📦 На списание</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Примечания:</label>
+            <textarea v-model="editData.notes" rows="3" class="textarea-field"></textarea>
+          </div>
         </div>
         
         <!-- ИБП -->
@@ -492,6 +679,50 @@
           <div class="form-group">
             <label>Комментарий:</label>
             <textarea v-model="editData.comment" rows="3" class="textarea-field"></textarea>
+          </div>
+        </div>
+        
+        <!-- Картридж -->
+        <div v-if="editEntityType === 'cartridge'">
+          <div class="form-group">
+            <label>Модель картриджа:</label>
+            <input v-model="editData.model" class="main-field">
+          </div>
+          <div class="form-group">
+            <label>Количество в Минске:</label>
+            <input v-model="editData.quantity_minsk" type="number" min="0" class="search-input">
+          </div>
+          <div class="form-group">
+            <label>Количество в Мачулищах:</label>
+            <input v-model="editData.quantity_machulishchi" type="number" min="0" class="search-input">
+          </div>
+          <div class="form-group">
+            <label>Совместимые МФУ:</label>
+            <div class="search-wrapper">
+              <input 
+                type="text" 
+                v-model="cartridgeMfpSearch" 
+                @input="searchCartridgeMFPs" 
+                placeholder="Поиск МФУ..."
+                class="search-input"
+              >
+              <div v-if="cartridgeMfpSearchResults.length" class="search-results">
+                <div 
+                  v-for="mfp in cartridgeMfpSearchResults" 
+                  :key="mfp.id" 
+                  @click="addCartridgeMFP(mfp)"
+                  class="search-result-item"
+                >
+                  ОС №{{ mfp.asset_number }} - {{ mfp.model }}
+                </div>
+              </div>
+            </div>
+            <div class="selected-items">
+              <div v-for="mfp in editCartridgeMFPs" :key="mfp.id" class="selected-tag">
+                {{ mfp.model }}
+                <button @click="removeCartridgeMFP(mfp.id)" class="remove-btn">×</button>
+              </div>
+            </div>
           </div>
         </div>
         
@@ -521,6 +752,8 @@
         </div>
       </div>
     </div>
+
+    <ConfirmModal ref="confirmModal" />
   </div>
 </template>
 
@@ -546,15 +779,28 @@ const editData = ref({})
 const editEntityId = ref(null)
 const allDepartments = ref([])
 const allLocations = ref([])
+const allMFPs = ref([])
 
 // Поиск отдела
 const departmentSearch = ref('')
 const departmentSearchResults = ref([])
 const selectedDepartment = ref(null)
 
+// Данные для картриджа
+const cartridgeMfpSearch = ref('')
+const cartridgeMfpSearchResults = ref([])
+const editCartridgeMFPs = ref([])
+
 // Данные для рабочего места
 const showWorkplaceModal = ref(false)
 const workplaceDetails = ref(null)
+
+// Данные для редактирования полей рабочего места
+const showWorkplaceFieldModal = ref(false)
+const editFieldType = ref('')
+const editFieldTitle = ref('')
+const editCityValue = ref(null)
+const editStatusValue = ref('active')
 
 // Данные для обслуживания ИБП
 const showUPSServiceModal = ref(false)
@@ -567,6 +813,12 @@ const newBattery = ref({
   comment: ''
 })
 
+// Данные для перемещения картриджа
+const showTransferModal = ref(false)
+const transferCartridge = ref(null)
+const transferQuantity = ref(1)
+const transferComment = ref('')
+
 const confirmModal = ref(null)
 
 const hasResults = computed(() => {
@@ -576,7 +828,8 @@ const hasResults = computed(() => {
     results.computers?.length || 
     results.mfps?.length || 
     results.tvs?.length || 
-    results.ups?.length)
+    results.ups?.length ||
+    results.cartridges?.length)
 })
 
 const totalResults = computed(() => {
@@ -586,7 +839,8 @@ const totalResults = computed(() => {
     (results.computers?.length || 0) +
     (results.mfps?.length || 0) +
     (results.tvs?.length || 0) +
-    (results.ups?.length || 0)
+    (results.ups?.length || 0) +
+    (results.cartridges?.length || 0)
 })
 
 // Форматирование даты
@@ -645,6 +899,23 @@ const getUPSStatusClass = (status) => {
   return classMap[status] || ''
 }
 
+// Статусы МФУ
+const getMFPStatusText = (status) => {
+  const statusMap = {
+    'operational': 'В эксплуатации',
+    'write_off': 'На списание'
+  }
+  return statusMap[status] || status
+}
+
+const getMFPStatusClass = (status) => {
+  const classMap = {
+    'operational': 'status-operational',
+    'write_off': 'status-write-off'
+  }
+  return classMap[status] || ''
+}
+
 // Получение названия типа сущности
 const getEntityTypeName = () => {
   const names = {
@@ -653,7 +924,8 @@ const getEntityTypeName = () => {
     'ups': 'ИБП',
     'mfp': 'МФУ',
     'tv': 'телевизор',
-    'workplace': 'рабочее место'
+    'workplace': 'рабочее место',
+    'cartridge': 'картридж'
   }
   return names[editEntityType.value] || ''
 }
@@ -678,6 +950,9 @@ const fetchEntityData = async (type, id) => {
       case 'tv':
         response = await axios.get(`${API}/tvs/${id}/`)
         break
+      case 'cartridge':
+        response = await axios.get(`${API}/cartridges/${id}/`)
+        break
       default:
         return null
     }
@@ -690,14 +965,9 @@ const fetchEntityData = async (type, id) => {
 
 // Открытие редактирования из окна деталей рабочего места
 const openEditFromWorkplace = async (type, id) => {
-  // Закрываем окно детализации
   showWorkplaceModal.value = false
-  
-  // Загружаем полные данные сущности
   const entityData = await fetchEntityData(type, id)
-  
   if (entityData) {
-    // Небольшая задержка для плавного перехода
     setTimeout(() => {
       openEditModal(type, entityData)
     }, 100)
@@ -709,12 +979,14 @@ const openEditFromWorkplace = async (type, id) => {
 // Загрузка данных для выпадающих списков
 const fetchSelectData = async () => {
   try {
-    const [depRes, locRes] = await Promise.all([
+    const [depRes, locRes, mfpRes] = await Promise.all([
       axios.get(`${API}/departments/`),
-      axios.get(`${API}/locations/`)
+      axios.get(`${API}/locations/`),
+      axios.get(`${API}/mfps/`)
     ])
     allDepartments.value = depRes.data
     allLocations.value = locRes.data
+    allMFPs.value = mfpRes.data
   } catch (error) {
     console.error('Ошибка загрузки данных:', error)
   }
@@ -738,6 +1010,30 @@ const selectDepartment = (department) => {
   departmentSearchResults.value = []
 }
 
+// Поиск МФУ для картриджа
+const searchCartridgeMFPs = () => {
+  if (!cartridgeMfpSearch.value) {
+    cartridgeMfpSearchResults.value = []
+    return
+  }
+  cartridgeMfpSearchResults.value = allMFPs.value.filter(mfp =>
+    mfp.model.toLowerCase().includes(cartridgeMfpSearch.value.toLowerCase()) ||
+    mfp.asset_number.toLowerCase().includes(cartridgeMfpSearch.value.toLowerCase())
+  ).slice(0, 10)
+}
+
+const addCartridgeMFP = (mfp) => {
+  if (!editCartridgeMFPs.value.find(m => m.id === mfp.id)) {
+    editCartridgeMFPs.value.push(mfp)
+  }
+  cartridgeMfpSearch.value = ''
+  cartridgeMfpSearchResults.value = []
+}
+
+const removeCartridgeMFP = (mfpId) => {
+  editCartridgeMFPs.value = editCartridgeMFPs.value.filter(m => m.id !== mfpId)
+}
+
 // Открытие деталей рабочего места
 const openWorkplaceDetails = async (id) => {
   try {
@@ -753,6 +1049,51 @@ const openWorkplaceDetails = async (id) => {
 const closeWorkplaceModal = () => {
   showWorkplaceModal.value = false
   workplaceDetails.value = null
+}
+
+// Открытие редактирования поля рабочего места
+const openWorkplaceFieldEdit = (field) => {
+  if (!workplaceDetails.value) return
+  
+  editFieldType.value = field
+  if (field === 'city') {
+    editFieldTitle.value = 'город'
+    editCityValue.value = workplaceDetails.value.city
+  } else if (field === 'status') {
+    editFieldTitle.value = 'статус'
+    editStatusValue.value = workplaceDetails.value.status || 'active'
+  }
+  showWorkplaceFieldModal.value = true
+}
+
+// Сохранение поля рабочего места
+const saveWorkplaceField = async () => {
+  if (!workplaceDetails.value) return
+  
+  try {
+    let updateData = {}
+    if (editFieldType.value === 'city') {
+      updateData = { city: editCityValue.value }
+    } else if (editFieldType.value === 'status') {
+      updateData = { 
+        status: editStatusValue.value,
+        is_active: editStatusValue.value === 'active'
+      }
+    }
+    
+    await axios.patch(`${API}/workplaces/${workplaceDetails.value.id}/`, updateData)
+    
+    const response = await axios.get(`${API}/workplaces/${workplaceDetails.value.id}/`)
+    workplaceDetails.value = response.data
+    
+    await performSearch()
+    
+    showWorkplaceFieldModal.value = false
+    showSuccess(`${editFieldTitle.value} успешно обновлен!`)
+  } catch (error) {
+    console.error('Ошибка сохранения:', error)
+    showError('Ошибка сохранения: ' + (error.response?.data?.detail || error.message))
+  }
 }
 
 // Загрузка истории замен для ИБП
@@ -803,8 +1144,6 @@ const addUPSBatteryHistory = async () => {
     
     await axios.post(`${API}/battery-history/`, historyData)
     await fetchUPSBatteryHistory(selectedUPSForService.value.id)
-    
-    // Обновляем данные в поиске
     await performSearch()
     
     newBattery.value = {
@@ -843,6 +1182,77 @@ const deleteUPSBatteryHistory = async (id) => {
   }
 }
 
+// Открытие модального окна перемещения картриджа
+const openTransferModal = (cart) => {
+  transferCartridge.value = cart
+  transferQuantity.value = 1
+  transferComment.value = ''
+  showTransferModal.value = true
+}
+
+// Перемещение картриджа
+const processTransfer = async () => {
+  if (!transferCartridge.value) return
+  
+  if (transferQuantity.value <= 0) {
+    showWarning('Укажите корректное количество')
+    return
+  }
+  
+  if (transferQuantity.value > transferCartridge.value.quantity_minsk) {
+    showWarning(`Недостаточно картриджей в Минске. Доступно: ${transferCartridge.value.quantity_minsk}`)
+    return
+  }
+  
+  try {
+    const updateData = {
+      model: transferCartridge.value.model,
+      quantity_minsk: transferCartridge.value.quantity_minsk - transferQuantity.value,
+      quantity_machulishchi: transferCartridge.value.quantity_machulishchi + transferQuantity.value,
+      compatible_mfps: transferCartridge.value.compatible_mfps_detail?.map(m => m.id) || []
+    }
+    
+    await axios.put(`${API}/cartridges/${transferCartridge.value.id}/`, updateData)
+    
+    await axios.post(`${API}/cartridge-movements/`, {
+      cartridge: transferCartridge.value.id,
+      movement_type: 'transfer',
+      from_location: 'minsk',
+      to_location: 'machulishchi',
+      quantity: transferQuantity.value,
+      comment: transferComment.value || 'Перемещение в Мачулищи'
+    })
+    
+    showTransferModal.value = false
+    await performSearch()
+    showSuccess('Картриджи перемещены в Мачулищи!')
+  } catch (error) {
+    console.error('Ошибка перемещения:', error)
+    showError('Ошибка перемещения картриджей')
+  }
+}
+
+// Удаление картриджа
+const deleteCartridge = async (id) => {
+  const confirmed = await confirmModal.value.open({
+    title: 'Удаление картриджа',
+    message: 'Вы уверены, что хотите удалить этот картридж?',
+    confirmText: 'Да, удалить',
+    type: 'danger'
+  })
+  
+  if (confirmed) {
+    try {
+      await axios.delete(`${API}/cartridges/${id}/`)
+      await performSearch()
+      showSuccess('Картридж удален!')
+    } catch (error) {
+      console.error('Ошибка удаления:', error)
+      showError('Ошибка удаления картриджа')
+    }
+  }
+}
+
 // Открытие модального окна редактирования
 const openEditModal = (type, entity) => {
   editEntityType.value = type
@@ -853,6 +1263,12 @@ const openEditModal = (type, entity) => {
     selectedDepartment.value = allDepartments.value.find(d => d.id === entity.department) || null
   } else {
     selectedDepartment.value = null
+  }
+  
+  if (type === 'cartridge') {
+    editCartridgeMFPs.value = [...(entity.compatible_mfps_detail || [])]
+    cartridgeMfpSearch.value = ''
+    cartridgeMfpSearchResults.value = []
   }
   
   departmentSearch.value = ''
@@ -866,8 +1282,11 @@ const closeEditModal = () => {
   editData.value = {}
   editEntityId.value = null
   selectedDepartment.value = null
+  editCartridgeMFPs.value = []
   departmentSearch.value = ''
   departmentSearchResults.value = []
+  cartridgeMfpSearch.value = ''
+  cartridgeMfpSearchResults.value = []
 }
 
 // Сохранение изменений
@@ -909,7 +1328,14 @@ const saveEdit = async () => {
         updateData = {
           asset_number: editData.value.asset_number,
           model: editData.value.model,
-          ip_address: editData.value.ip_address || null
+          ip_address: editData.value.ip_address || null,
+          cabinet_number: editData.value.cabinet_number || null,
+          login: editData.value.login || null,
+          password: editData.value.password || null,
+          status: editData.value.status,
+          notes: editData.value.notes || null,
+          serial_number: editData.value.serial_number || null,
+          mac_address: editData.value.mac_address || null
         }
         await axios.put(`${API}/mfps/${editEntityId.value}/`, updateData)
         break
@@ -921,6 +1347,15 @@ const saveEdit = async () => {
           location: editData.value.location || null
         }
         await axios.put(`${API}/tvs/${editEntityId.value}/`, updateData)
+        break
+      case 'cartridge':
+        updateData = {
+          model: editData.value.model,
+          quantity_minsk: editData.value.quantity_minsk,
+          quantity_machulishchi: editData.value.quantity_machulishchi,
+          compatible_mfps: editCartridgeMFPs.value.map(m => m.id)
+        }
+        await axios.put(`${API}/cartridges/${editEntityId.value}/`, updateData)
         break
     }
     
@@ -1097,7 +1532,7 @@ onMounted(() => {
 
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: 1rem;
 }
 
@@ -1156,15 +1591,18 @@ onMounted(() => {
   align-items: center;
 }
 
-.edit-icon-btn {
+.edit-icon-btn, .service-icon-btn, .transfer-icon-btn, .delete-icon-btn {
   background: none;
   border: none;
   font-size: 1rem;
   cursor: pointer;
   padding: 6px 10px;
   border-radius: 8px;
-  color: #3498db;
   transition: all 0.2s;
+}
+
+.edit-icon-btn {
+  color: #3498db;
 }
 
 .edit-icon-btn:hover {
@@ -1173,18 +1611,29 @@ onMounted(() => {
 }
 
 .service-icon-btn {
-  background: none;
-  border: none;
-  font-size: 1rem;
-  cursor: pointer;
-  padding: 6px 10px;
-  border-radius: 8px;
   color: #f39c12;
-  transition: all 0.2s;
 }
 
 .service-icon-btn:hover {
   background: #f39c12;
+  color: white;
+}
+
+.transfer-icon-btn {
+  color: #f39c12;
+}
+
+.transfer-icon-btn:hover {
+  background: #f39c12;
+  color: white;
+}
+
+.delete-icon-btn {
+  color: #e74c3c;
+}
+
+.delete-icon-btn:hover {
+  background: #e74c3c;
   color: white;
 }
 
@@ -1260,6 +1709,147 @@ onMounted(() => {
   color: #333;
 }
 
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.info-item {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 0.8rem;
+}
+
+.info-item.full-width {
+  grid-column: span 2;
+}
+
+.info-item .label {
+  font-weight: 600;
+  color: #666;
+  min-width: 70px;
+}
+
+.info-item .value {
+  color: #333;
+  word-break: break-all;
+}
+
+.mac-value {
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+}
+
+.value.notes {
+  font-style: italic;
+  color: #e67e22;
+}
+
+.status-badge-small {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.status-operational {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-write-off {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.compatible-cartridges {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #eee;
+}
+
+.compatible-cartridges .label {
+  font-weight: 600;
+  color: #666;
+  font-size: 0.75rem;
+  margin-bottom: 6px;
+}
+
+.cartridges-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cartridge-tag {
+  background: #e0e0e0;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  color: #555;
+}
+
+.quantity-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.quantity-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.quantity-badge.minsk {
+  background: #d4edda;
+  color: #155724;
+}
+
+.quantity-badge.machulishchi {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.quantity-badge.total {
+  background: #cce5ff;
+  color: #004085;
+}
+
+.compatible-mfps {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.compatible-mfps .label {
+  font-weight: 600;
+  color: #666;
+  font-size: 0.75rem;
+  margin-bottom: 6px;
+}
+
+.mfps-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mfp-tag {
+  background: #e0e0e0;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  color: #555;
+}
+
 .history-preview {
   margin-top: 10px;
   padding-top: 8px;
@@ -1312,6 +1902,11 @@ onMounted(() => {
   color: #856404;
 }
 
+.no-data {
+  color: #999;
+  font-style: italic;
+}
+
 /* Модальные окна */
 .modal {
   position: fixed;
@@ -1335,7 +1930,7 @@ onMounted(() => {
   padding: 2rem;
   border-radius: 20px;
   width: 90%;
-  max-width: 550px;
+  max-width: 600px;
   box-shadow: 0 20px 40px rgba(0,0,0,0.2);
   max-height: 80vh;
   overflow-y: auto;
@@ -1385,8 +1980,9 @@ onMounted(() => {
   font-family: inherit;
 }
 
-.ip-input {
+.ip-input, .mac-input {
   font-family: 'Courier New', monospace;
+  letter-spacing: 0.5px;
 }
 
 .checkbox-label {
@@ -1429,7 +2025,6 @@ onMounted(() => {
   background: #c0392b;
 }
 
-/* Детали рабочего места */
 .workplace-details {
   margin-top: 0.5rem;
 }
@@ -1452,6 +2047,30 @@ onMounted(() => {
 .detail-value {
   color: #333;
   flex: 1;
+}
+
+.clickable-row {
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 6px 8px;
+  margin: -6px -8px;
+  border-radius: 8px;
+}
+
+.clickable-row:hover {
+  background: rgba(26, 188, 156, 0.1);
+}
+
+.edit-hint-small {
+  opacity: 0;
+  margin-left: 8px;
+  font-size: 0.7rem;
+  color: #1abc9c;
+  transition: opacity 0.2s;
+}
+
+.clickable-row:hover .edit-hint-small {
+  opacity: 1;
 }
 
 .sub-entity {
@@ -1517,7 +2136,6 @@ onMounted(() => {
   margin-top: 2px;
 }
 
-/* Обслуживание ИБП */
 .service-form {
   background: #f8f9fa;
   padding: 1rem;
@@ -1611,13 +2229,6 @@ onMounted(() => {
   margin-bottom: 4px;
 }
 
-.no-data {
-  color: #999;
-  font-style: italic;
-  text-align: center;
-  padding: 20px;
-}
-
 .search-wrapper {
   position: relative;
 }
@@ -1659,6 +2270,13 @@ onMounted(() => {
   margin-top: 8px;
 }
 
+.selected-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0;
+}
+
 .remove-btn {
   background: none;
   border: none;
@@ -1673,9 +2291,25 @@ onMounted(() => {
   color: #e74c3c;
 }
 
+.available-stock {
+  padding: 10px;
+  background: #e8f5e9;
+  border-radius: 8px;
+  font-weight: 500;
+  color: #2c3e50;
+}
+
 @media (max-width: 768px) {
   .cards-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .info-item.full-width {
+    grid-column: span 1;
   }
   
   .modal-content {
@@ -1714,6 +2348,10 @@ onMounted(() => {
   
   .form-row .form-group {
     margin-bottom: 1rem;
+  }
+  
+  .selected-tag {
+    font-size: 0.8rem;
   }
 }
 </style>

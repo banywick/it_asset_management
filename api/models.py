@@ -130,16 +130,31 @@ class Computer(models.Model):
         return f"{type_icon} ОС №{self.asset_number} - {self.system_unit or 'системный блок не указан'}"
 
 class MFP(models.Model):
+    STATUS_CHOICES = [
+        ('operational', '✅ В эксплуатации'),
+        ('write_off', '📦 На списание'),
+    ]
+    
     asset_number = models.CharField(max_length=100, verbose_name="Номер основного средства", default="не определен")
     model = models.CharField(max_length=100, verbose_name="Модель МФУ")
     ip_address = models.GenericIPAddressField(null=True, blank=True, verbose_name="IP адрес")
+    
+    # Новые поля
+    cabinet_number = models.CharField(max_length=50, null=True, blank=True, verbose_name="Номер кабинета")
+    login = models.CharField(max_length=100, null=True, blank=True, verbose_name="Логин")
+    password = models.CharField(max_length=100, null=True, blank=True, verbose_name="Пароль")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='operational', verbose_name="Статус")
+    notes = models.TextField(null=True, blank=True, verbose_name="Примечания")
+    serial_number = models.CharField(max_length=100, null=True, blank=True, verbose_name="Серийный номер")
+    mac_address = models.CharField(max_length=17, null=True, blank=True, verbose_name="MAC адрес", help_text="Формат: XX:XX:XX:XX:XX:XX")
 
     class Meta:
         verbose_name = "МФУ"
         verbose_name_plural = "МФУ"
 
     def __str__(self):
-        return f"ОС №{self.asset_number} - {self.model}"
+        status_icon = "✅" if self.status == 'operational' else "📦"
+        return f"{status_icon} ОС №{self.asset_number} - {self.model}"
 
 class UPS(models.Model):
     STATUS_CHOICES = [
@@ -189,3 +204,50 @@ class BatteryHistory(models.Model):
     
     def __str__(self):
         return f"{self.ups} - замена АКБ от {self.replaced_at}"
+    
+
+class Cartridge(models.Model):
+    """Модель картриджа"""
+    model = models.CharField(max_length=100, verbose_name="Модель картриджа", unique=True)
+    compatible_mfps = models.ManyToManyField('MFP', blank=True, verbose_name="Совместимые МФУ")
+    
+    # Количество на складах
+    quantity_minsk = models.IntegerField(default=0, verbose_name="Количество в Минске")
+    quantity_machulishchi = models.IntegerField(default=0, verbose_name="Количество в Мачулищах")
+    
+    class Meta:
+        verbose_name = "Картридж"
+        verbose_name_plural = "Картриджи"
+    
+    def __str__(self):
+        return f"{self.name} ({self.model})"
+
+class CartridgeMovement(models.Model):
+    """История перемещений картриджей"""
+    MOVEMENT_TYPES = [
+        ('in', 'Поступление'),
+        ('out', 'Выдача'),
+        ('transfer', 'Перемещение'),
+    ]
+    
+    LOCATIONS = [
+        ('minsk', 'Минск'),
+        ('machulishchi', 'Мачулищи'),
+    ]
+    
+    cartridge = models.ForeignKey(Cartridge, on_delete=models.CASCADE, verbose_name="Картридж", related_name='movements')
+    movement_type = models.CharField(max_length=20, choices=MOVEMENT_TYPES, verbose_name="Тип операции")
+    quantity = models.IntegerField(verbose_name="Количество")
+    from_location = models.CharField(max_length=20, choices=LOCATIONS, null=True, blank=True, verbose_name="Откуда")
+    to_location = models.CharField(max_length=20, choices=LOCATIONS, null=True, blank=True, verbose_name="Куда")
+    comment = models.TextField(blank=True, null=True, verbose_name="Комментарий")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата операции")
+    performed_by = models.CharField(max_length=150, verbose_name="Кто выполнил операцию", blank=True, null=True)
+    
+    class Meta:
+        verbose_name = "Перемещение картриджа"
+        verbose_name_plural = "Перемещения картриджей"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.get_movement_type_display()} - {self.cartridge.name} - {self.quantity} шт."
