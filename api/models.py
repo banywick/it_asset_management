@@ -1,4 +1,23 @@
 from django.db import models
+from django.contrib.auth.models import User
+
+
+
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    phone = models.CharField(max_length=20, blank=True, null=True, verbose_name="Телефон")
+    position = models.CharField(max_length=100, blank=True, null=True, verbose_name="Должность")
+    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True, verbose_name="Аватар")
+    is_approved = models.BooleanField(default=False, verbose_name="Подтвержден администратором")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата регистрации")
+    
+    class Meta:
+        verbose_name = "Профиль пользователя"
+        verbose_name_plural = "Профили пользователей"
+    
+    def __str__(self):
+        return f"{self.user.username} - {'Подтвержден' if self.is_approved else 'Ожидает подтверждения'}"
 
 class Department(models.Model):
     name = models.CharField(max_length=100, verbose_name="Отдел", unique=True)

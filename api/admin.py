@@ -1,4 +1,7 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.models import User
+from .models import UserProfile
 from django.urls import path
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
@@ -7,6 +10,24 @@ from django.http import HttpResponse
 import pandas as pd
 from io import BytesIO
 from .models import Department, Employee, Workplace, Computer, Monitor, TV, MFP, UPS, Location, BatteryHistory
+
+
+
+
+class UserProfileInline(admin.StackedInline):
+    model = UserProfile
+    can_delete = False
+    verbose_name_plural = 'Профиль'
+
+class CustomUserAdmin(UserAdmin):
+    inlines = [UserProfileInline]
+    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'get_is_approved')
+    list_filter = ('is_staff', 'is_superuser', 'profile__is_approved')
+    
+    def get_is_approved(self, obj):
+        return obj.profile.is_approved if hasattr(obj, 'profile') else False
+    get_is_approved.boolean = True
+    get_is_approved.short_description = 'Подтвержден'
 
 # ========== ФУНКЦИИ ИМПОРТА ДЛЯ КАЖДОГО ЛИСТА ==========
 
@@ -535,7 +556,8 @@ class BatteryHistoryAdmin(admin.ModelAdmin):
     )
 
 # ========== РЕГИСТРАЦИЯ МОДЕЛЕЙ ==========
-
+admin.site.unregister(User)
+admin.site.register(User, CustomUserAdmin)
 admin.site.register(Department, DepartmentAdmin)
 admin.site.register(Employee, EmployeeAdmin)
 admin.site.register(Workplace, WorkplaceAdmin)

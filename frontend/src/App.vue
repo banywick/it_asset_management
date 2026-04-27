@@ -2,6 +2,7 @@
   <div id="app">
     <nav class="navbar">
       <div class="nav-brand">IT Asset Tracker</div>
+      
       <div class="search-container">
         <div class="search-bar">
           <input 
@@ -34,6 +35,35 @@
           </div>
         </div>
       </div>
+      
+      <div class="nav-right">
+        <div class="user-menu" @click="toggleUserMenu">
+          <div class="user-avatar">
+            <i class="fas fa-user-circle"></i>
+          </div>
+          <span class="user-name">{{ displayUserName }}</span>
+          <i class="fas fa-chevron-down" :class="{ 'rotated': userMenuOpen }"></i>
+        </div>
+        
+        <div v-if="userMenuOpen" class="user-dropdown">
+          <div class="user-info-header">
+            <div class="dropdown-avatar">
+              <i class="fas fa-user-circle"></i>
+            </div>
+            <div class="dropdown-user-details">
+              <div class="dropdown-name">{{ currentUser?.first_name }} {{ currentUser?.last_name }}</div>
+              <div class="dropdown-username">{{ currentUser?.username }}</div>
+              <div class="dropdown-email">{{ currentUser?.email }}</div>
+            </div>
+          </div>
+          <div class="dropdown-divider"></div>
+          <button @click="logout" class="logout-btn">
+            <i class="fas fa-sign-out-alt"></i>
+            Выйти
+          </button>
+        </div>
+      </div>
+      
       <div class="nav-links">
         <router-link to="/">Рабочие места</router-link>
         <router-link to="/computers">Компьютеры</router-link>
@@ -44,6 +74,7 @@
         <router-link to="/employees">Сотрудники</router-link>
       </div>
     </nav>
+    
     <div class="container">
       <router-view />
     </div>
@@ -51,17 +82,28 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 
 const router = useRouter()
+const route = useRoute()
 const API = 'http://localhost:8000/api'
 
 const searchQuery = ref('')
 const showSuggestions = ref(false)
 const suggestions = ref([])
+const userMenuOpen = ref(false)
+const currentUser = ref(null)
 let debounceTimer = null
+
+// Вычисляемое свойство для отображения имени пользователя
+const displayUserName = computed(() => {
+  if (currentUser.value?.first_name && currentUser.value?.last_name) {
+    return `${currentUser.value.first_name} ${currentUser.value.last_name}`
+  }
+  return currentUser.value?.username || 'Гость'
+})
 
 // Функция для получения подсказок
 const fetchSuggestions = async (query) => {
@@ -111,9 +153,93 @@ const goToSearch = () => {
   }
 }
 
-// Следим за изменением маршрута
-watch(() => router.currentRoute.value.path, () => {
+// Переключение меню пользователя
+const toggleUserMenu = () => {
+  userMenuOpen.value = !userMenuOpen.value
+}
+
+// Закрытие меню при клике вне его
+const handleClickOutside = (event) => {
+  const userMenu = document.querySelector('.user-menu')
+  const dropdown = document.querySelector('.user-dropdown')
+  if (userMenu && !userMenu.contains(event.target) && dropdown && !dropdown.contains(event.target)) {
+    userMenuOpen.value = false
+  }
+}
+
+// Выход из системы
+const logout = async () => {
+  try {
+    await axios.post(`${API}/auth/logout/`)
+    localStorage.removeItem('user')
+    currentUser.value = null
+    router.push('/login')
+  } catch (error) {
+    console.error('Ошибка выхода:', error)
+    localStorage.removeItem('user')
+    currentUser.value = null
+    router.push('/login')
+  }
+}
+
+// Загрузка текущего пользователя из localStorage
+const loadCurrentUser = () => {
+  const storedUser = localStorage.getItem('user')
+  if (storedUser) {
+    currentUser.value = JSON.parse(storedUser)
+  } else {
+    currentUser.value = null
+  }
+}
+
+// Проверка аутентификации на сервере
+const checkAuth = async () => {
+  try {
+    const response = await axios.get(`${API}/auth/check_auth/`, {
+      withCredentials: true
+    })
+    if (response.data.authenticated) {
+      localStorage.setItem('user', JSON.stringify(response.data.user))
+      currentUser.value = response.data.user
+    } else {
+      localStorage.removeItem('user')
+      currentUser.value = null
+      if (route.path !== '/login') {
+        router.push('/login')
+      }
+    }
+  } catch (error) {
+    console.error('Ошибка проверки аутентификации:', error)
+    const storedUser = localStorage.getItem('user')
+    if (storedUser) {
+      currentUser.value = JSON.parse(storedUser)
+    }
+  }
+}
+
+// Событие storage для синхронизации между вкладками
+const handleStorageChange = (event) => {
+  if (event.key === 'user') {
+    loadCurrentUser()
+  }
+}
+
+// Следим за изменением маршрута - обновляем пользователя при каждом переходе
+watch(() => route.path, () => {
+  loadCurrentUser()
   showSuggestions.value = false
+  userMenuOpen.value = false
+}, { immediate: true })
+
+onMounted(() => {
+  loadCurrentUser()
+  document.addEventListener('click', handleClickOutside)
+  window.addEventListener('storage', handleStorageChange)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+  window.removeEventListener('storage', handleStorageChange)
 })
 </script>
 
@@ -245,6 +371,129 @@ body {
   border-radius: 12px;
 }
 
+/* Стили для пользовательского меню */
+.nav-right {
+  position: relative;
+}
+
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.1);
+  transition: background 0.2s;
+}
+
+.user-menu:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.user-avatar {
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.user-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.fa-chevron-down {
+  font-size: 0.8rem;
+  transition: transform 0.3s;
+}
+
+.fa-chevron-down.rotated {
+  transform: rotate(180deg);
+}
+
+.user-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 10px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  min-width: 280px;
+  overflow: hidden;
+  z-index: 1001;
+  animation: fadeInDown 0.2s ease;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.user-info-header {
+  display: flex;
+  gap: 15px;
+  padding: 20px;
+  background: linear-gradient(135deg, #1abc9c, #16a085);
+}
+
+.dropdown-avatar {
+  font-size: 3rem;
+  color: white;
+}
+
+.dropdown-user-details {
+  flex: 1;
+}
+
+.dropdown-name {
+  font-weight: bold;
+  color: white;
+  font-size: 1rem;
+}
+
+.dropdown-username {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.8);
+  margin-top: 2px;
+}
+
+.dropdown-email {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 2px;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: #eee;
+  margin: 0;
+}
+
+.logout-btn {
+  width: 100%;
+  padding: 12px 20px;
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-size: 0.9rem;
+  color: #e74c3c;
+}
+
+.logout-btn:hover {
+  background: #fef5e7;
+}
+
 .nav-links {
   display: flex;
   gap: 1rem;
@@ -285,8 +534,13 @@ body {
     width: 100%;
   }
   
-  .nav-links {
-    justify-content: center;
+  .nav-right {
+    align-self: flex-end;
+  }
+  
+  .user-dropdown {
+    right: 0;
+    left: auto;
   }
 }
 </style>

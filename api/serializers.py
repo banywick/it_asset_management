@@ -1,6 +1,63 @@
 from rest_framework import serializers
 from .models import *
 
+from django.contrib.auth.models import User
+from .models import UserProfile
+
+
+class UserSerializer(serializers.ModelSerializer):
+    is_approved = serializers.BooleanField(source='profile.is_approved', read_only=True)
+    
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'is_approved']
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    
+    class Meta:
+        model = UserProfile
+        fields = '__all__'
+
+class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
+    password2 = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
+    email = serializers.EmailField(required=True)
+    
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'password', 'password2', 'first_name', 'last_name']
+    
+    def validate(self, attrs):
+        if attrs['password'] != attrs['password2']:
+            raise serializers.ValidationError({"password": "Пароли не совпадают"})
+        
+        # Проверка на существующего пользователя
+        if User.objects.filter(username=attrs['username']).exists():
+            raise serializers.ValidationError({"username": "Пользователь с таким логином уже существует"})
+        
+        if User.objects.filter(email=attrs['email']).exists():
+            raise serializers.ValidationError({"email": "Пользователь с таким email уже существует"})
+        
+        return attrs
+    
+    def create(self, validated_data):
+        user = User.objects.create(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            first_name=validated_data.get('first_name', ''),
+            last_name=validated_data.get('last_name', '')
+        )
+        user.set_password(validated_data['password'])
+        user.save()
+        
+        # Создаем профиль пользователя (по умолчанию is_approved=False)
+        UserProfile.objects.create(user=user, is_approved=False)
+        
+        return user
+
+
+
 class LocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Location

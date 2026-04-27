@@ -1,10 +1,73 @@
 from rest_framework import viewsets
+from rest_framework.viewsets import GenericViewSet
+from django.contrib.auth import authenticate, login, logout
 from .models import *
 from .serializers import *
-from django.db.models import Q
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework import status
 
+
+class AuthViewSet(GenericViewSet):
+    
+    @action(detail=False, methods=['post'])
+    def login(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
+        
+        if not username or not password:
+            return Response(
+                {'error': 'Пожалуйста, укажите логин и пароль'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        user = authenticate(request, username=username, password=password)
+        
+        if user is not None:
+            # Проверяем, подтвержден ли пользователь
+            if hasattr(user, 'profile') and not user.profile.is_approved:
+                return Response(
+                    {'error': 'Ваша учетная запись ожидает подтверждения администратором'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            login(request, user)
+            return Response({
+                'success': True,
+                'user': UserSerializer(user).data,
+                'message': f'Добро пожаловать, {user.username}!'
+            })
+        else:
+            return Response(
+                {'error': 'Неверный логин или пароль'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+    
+    @action(detail=False, methods=['post'])
+    def logout(self, request):
+        logout(request)
+        return Response({'success': True, 'message': 'Вы успешно вышли из системы'})
+    
+    @action(detail=False, methods=['get'])
+    def check_auth(self, request):
+        if request.user.is_authenticated:
+            return Response({
+                'authenticated': True,
+                'user': UserSerializer(request.user).data
+            })
+        return Response({'authenticated': False})
+    
+    @action(detail=False, methods=['post'])
+    def register(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            return Response({
+                'success': True,
+                'message': 'Регистрация прошла успешно! После подтверждения администратором вы сможете войти в систему.',
+                'requires_approval': True
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = Department.objects.all()
     serializer_class = DepartmentSerializer
