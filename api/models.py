@@ -192,6 +192,10 @@ class UPS(models.Model):
     
     # Временная замена
     replacement_ups = models.OneToOneField('self', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Временная замена", related_name='replaced_by')
+
+    class Meta:
+        verbose_name = "Бесперебойник"
+        verbose_name_plural = "Бесперебойники"
     
     def __str__(self):
         status_emoji = {
@@ -239,7 +243,7 @@ class Cartridge(models.Model):
         verbose_name_plural = "Картриджи"
     
     def __str__(self):
-        return f"{self.name} ({self.model})"
+        return f"({self.model})"
 
 class CartridgeMovement(models.Model):
     """История перемещений картриджей"""
