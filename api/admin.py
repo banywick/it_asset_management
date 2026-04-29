@@ -634,25 +634,38 @@ class CartridgeAdmin(ImportExcelAdmin):
     filter_horizontal = ('compatible_mfps',)
 
 class CartridgeMovementAdmin(admin.ModelAdmin):
-    list_display = ('cartridge', 'movement_type', 'quantity', 'from_location', 'to_location', 'created_at')
-    list_filter = ('movement_type', 'created_at', 'from_location', 'to_location')
-    search_fields = ('cartridge__model', 'comment')
+    list_display = ('cartridge', 'movement_type', 'quantity', 'get_from_location', 'get_to_location', 'created_at')
+    list_filter = ('movement_type', 'created_at')
+    search_fields = ('cartridge__model', 'comment', 'performed_by')
     list_per_page = 20
+    readonly_fields = ('created_at',)
     
     fieldsets = (
         ('Информация о перемещении', {
-            'fields': ('cartridge', 'movement_type', 'quantity', 'from_location', 'to_location')
+            'fields': ('cartridge', 'movement_type', 'quantity')
+        }),
+        ('Локации', {
+            'fields': ('from_location', 'to_location')
         }),
         ('Дополнительно', {
-            'fields': ('comment', 'performed_by')
+            'fields': ('comment', 'performed_by', 'created_at')
         }),
     )
+    
+    def get_from_location(self, obj):
+        return obj.get_from_location_display() if obj.from_location else '-'
+    get_from_location.short_description = 'Откуда'
+    
+    def get_to_location(self, obj):
+        return obj.get_to_location_display() if obj.to_location else '-'
+    get_to_location.short_description = 'Куда'
 
 class BatteryHistoryAdmin(admin.ModelAdmin):
     list_display = ('ups', 'new_battery_serial', 'replaced_at', 'performed_by')
     list_filter = ('replaced_at',)
     search_fields = ('ups__asset_number', 'ups__model', 'new_battery_serial', 'old_battery_serial')
     list_per_page = 20
+    readonly_fields = ('replaced_at',)
     
     fieldsets = (
         ('Информация о замене', {

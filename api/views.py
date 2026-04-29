@@ -6,7 +6,335 @@ from .serializers import *
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
+import io
+import xlsxwriter
+from django.http import HttpResponse
+from django.db.models import Q
+from django.utils import timezone
+from datetime import datetime, timedelta
 
+class ReportViewSet(viewsets.GenericViewSet):
+    
+    @action(detail=False, methods=['post'])
+    def generate_report(self, request):
+        """Генерация Excel отчета по выбранным сущностям"""
+        
+        # Получаем параметры из запроса
+        entities = request.data.get('entities', [])
+        date_from = request.data.get('date_from')
+        date_to = request.data.get('date_to')
+        
+        # Парсим даты
+        if date_from and date_to:
+            date_from = datetime.strptime(date_from, '%Y-%m-%d')
+            date_to = datetime.strptime(date_to, '%Y-%m-%d')
+        else:
+            # За все время: устанавливаем очень раннюю дату
+            date_from = datetime(2000, 1, 1)
+            date_to = timezone.now()
+        
+        # Создаем Excel файл в памяти
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        
+        # Форматы для стилей
+        header_format = workbook.add_format({
+            'bold': True,
+            'bg_color': '#1abc9c',
+            'font_color': 'white',
+            'border': 1,
+            'align': 'center',
+            'valign': 'vcenter'
+        })
+        
+        cell_format = workbook.add_format({
+            'border': 1,
+            'align': 'left',
+            'valign': 'vcenter'
+        })
+        
+        date_format = workbook.add_format({
+            'border': 1,
+            'align': 'center',
+            'valign': 'vcenter',
+            'num_format': 'dd.mm.yyyy'
+        })
+        
+        # Шапка отчета
+        report_sheet = workbook.add_worksheet('Общая информация')
+        report_sheet.merge_range('A1:E1', 'IT Asset Tracker - Отчет по активам', header_format)
+        report_sheet.write(2, 0, 'Дата формирования отчета:', cell_format)
+        report_sheet.write(2, 1, datetime.now().strftime('%d.%m.%Y %H:%M:%S'), cell_format)
+        report_sheet.write(3, 0, 'Период:', cell_format)
+        report_sheet.write(3, 1, f"{date_from.strftime('%d.%m.%Y')} - {date_to.strftime('%d.%m.%Y')}", cell_format)
+        report_sheet.set_column('A:A', 20)
+        report_sheet.set_column('B:B', 30)
+        
+        # Генерируем отчеты по выбранным сущностям
+        if not entities or 'employees' in entities:
+            self._generate_employee_report(workbook, header_format, cell_format, date_format, date_from, date_to)
+        
+        if not entities or 'workplaces' in entities:
+            self._generate_workplace_report(workbook, header_format, cell_format, date_format, date_from, date_to)
+        
+        if not entities or 'computers' in entities:
+            self._generate_computer_report(workbook, header_format, cell_format, date_format, date_from, date_to)
+        
+        if not entities or 'mfps' in entities:
+            self._generate_mfp_report(workbook, header_format, cell_format, date_format, date_from, date_to)
+        
+        if not entities or 'ups' in entities:
+            self._generate_ups_report(workbook, header_format, cell_format, date_format, date_from, date_to)
+        
+        if not entities or 'cartridges' in entities:
+            self._generate_cartridge_report(workbook, header_format, cell_format, date_format, date_from, date_to)
+        
+        if not entities or 'tvs' in entities:
+            self._generate_tv_report(workbook, header_format, cell_format, date_format, date_from, date_to)
+        
+        workbook.close()
+        output.seek(0)
+        
+        # Формируем имя файла
+        filename = f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        
+        # Отправляем файл
+        response = HttpResponse(
+            output,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+    
+    def _generate_employee_report(self, workbook, header_format, cell_format, date_format, date_from, date_to):
+        """Отчет по сотрудникам"""
+        worksheet = workbook.add_worksheet('Сотрудники')
+        
+        # Заголовки
+        headers = ['ID', 'ФИО', 'Отдел', 'Рабочее место', 'Город', 'Статус рабочего места', 'Компьютер', 'ИБП', 'МФУ']
+        for col, header in enumerate(headers):
+            worksheet.write(0, col, header, header_format)
+        
+        # Данные
+        employees = Employee.objects.all()
+        row = 1
+        for emp in employees:
+            workplace = Workplace.objects.filter(employee=emp).first()
+            
+            worksheet.write(row, 0, emp.id, cell_format)
+            worksheet.write(row, 1, emp.full_name, cell_format)
+            worksheet.write(row, 2, emp.department.name if emp.department else '-', cell_format)
+            worksheet.write(row, 3, workplace.location if workplace else '-', cell_format)
+            worksheet.write(row, 4, workplace.city.name if workplace and workplace.city else '-', cell_format)
+            worksheet.write(row, 5, workplace.get_status_display() if workplace else '-', cell_format)
+            worksheet.write(row, 6, workplace.computer.asset_number if workplace and workplace.computer else '-', cell_format)
+            worksheet.write(row, 7, workplace.ups.model if workplace and workplace.ups else '-', cell_format)
+            worksheet.write(row, 8, workplace.mfp.model if workplace and workplace.mfp else '-', cell_format)
+            row += 1
+        
+        worksheet.set_column('A:A', 8)
+        worksheet.set_column('B:B', 30)
+        worksheet.set_column('C:C', 20)
+        worksheet.set_column('D:D', 25)
+        worksheet.set_column('E:E', 15)
+        worksheet.set_column('F:F', 20)
+        worksheet.set_column('G:G', 15)
+        worksheet.set_column('H:H', 20)
+        worksheet.set_column('I:I', 20)
+    
+    def _generate_workplace_report(self, workbook, header_format, cell_format, date_format, date_from, date_to):
+        """Отчет по рабочим местам"""
+        worksheet = workbook.add_worksheet('Рабочие места')
+        
+        headers = ['ID', 'Сотрудник', 'Отдел', 'Расположение', 'Город', 'Статус', 'Компьютер', 'ИБП', 'МФУ', 'Дата создания']
+        for col, header in enumerate(headers):
+            worksheet.write(0, col, header, header_format)
+        
+        workplaces = Workplace.objects.all()
+        row = 1
+        for wp in workplaces:
+            worksheet.write(row, 0, wp.id, cell_format)
+            worksheet.write(row, 1, wp.employee.full_name, cell_format)
+            worksheet.write(row, 2, wp.employee.department.name if wp.employee.department else '-', cell_format)
+            worksheet.write(row, 3, wp.location, cell_format)
+            worksheet.write(row, 4, wp.city.name if wp.city else '-', cell_format)
+            worksheet.write(row, 5, wp.get_status_display(), cell_format)
+            worksheet.write(row, 6, wp.computer.asset_number if wp.computer else '-', cell_format)
+            worksheet.write(row, 7, wp.ups.model if wp.ups else '-', cell_format)
+            worksheet.write(row, 8, wp.mfp.model if wp.mfp else '-', cell_format)
+            worksheet.write(row, 9, wp.created_at.strftime('%d.%m.%Y'), date_format)
+            row += 1
+        
+        worksheet.set_column('A:A', 8)
+        worksheet.set_column('B:B', 30)
+        worksheet.set_column('C:C', 20)
+        worksheet.set_column('D:D', 25)
+        worksheet.set_column('E:E', 15)
+        worksheet.set_column('F:F', 20)
+        worksheet.set_column('G:G', 15)
+        worksheet.set_column('H:H', 20)
+        worksheet.set_column('I:I', 20)
+        worksheet.set_column('J:J', 15)
+    
+    def _generate_computer_report(self, workbook, header_format, cell_format, date_format, date_from, date_to):
+        """Отчет по компьютерам"""
+        worksheet = workbook.add_worksheet('Компьютеры')
+        
+        headers = ['ID', 'Номер ОС', 'Тип', 'Системный блок', 'Мониторы', 'Клавиатура', 'Мышь', 'Статус', 'Владелец', 'Отдел']
+        for col, header in enumerate(headers):
+            worksheet.write(0, col, header, header_format)
+        
+        computers = Computer.objects.all()
+        row = 1
+        for comp in computers:
+            workplace = Workplace.objects.filter(computer=comp).first()
+            owner = workplace.employee.full_name if workplace else '-'
+            department = workplace.employee.department.name if workplace and workplace.employee.department else '-'
+            
+            worksheet.write(row, 0, comp.id, cell_format)
+            worksheet.write(row, 1, comp.asset_number, cell_format)
+            worksheet.write(row, 2, comp.get_computer_type_display(), cell_format)
+            worksheet.write(row, 3, comp.system_unit or '-', cell_format)
+            monitors = ', '.join([m.brand for m in comp.monitors.all()]) or '-'
+            worksheet.write(row, 4, monitors, cell_format)
+            worksheet.write(row, 5, 'Да' if comp.has_keyboard else 'Нет', cell_format)
+            worksheet.write(row, 6, 'Да' if comp.has_mouse else 'Нет', cell_format)
+            worksheet.write(row, 7, comp.get_service_status_display(), cell_format)
+            worksheet.write(row, 8, owner, cell_format)
+            worksheet.write(row, 9, department, cell_format)
+            row += 1
+        
+        worksheet.set_column('A:A', 8)
+        worksheet.set_column('B:B', 15)
+        worksheet.set_column('C:C', 15)
+        worksheet.set_column('D:D', 35)
+        worksheet.set_column('E:E', 20)
+        worksheet.set_column('F:F', 10)
+        worksheet.set_column('G:G', 10)
+        worksheet.set_column('H:H', 15)
+        worksheet.set_column('I:I', 25)
+        worksheet.set_column('J:J', 20)
+    
+    def _generate_mfp_report(self, workbook, header_format, cell_format, date_format, date_from, date_to):
+        """Отчет по МФУ"""
+        worksheet = workbook.add_worksheet('МФУ')
+        
+        headers = ['ID', 'Номер ОС', 'Модель', 'IP адрес', 'Кабинет', 'Серийный номер', 'MAC адрес', 'Логин', 'Статус', 'Примечания']
+        for col, header in enumerate(headers):
+            worksheet.write(0, col, header, header_format)
+        
+        mfps = MFP.objects.all()
+        row = 1
+        for mfp in mfps:
+            worksheet.write(row, 0, mfp.id, cell_format)
+            worksheet.write(row, 1, mfp.asset_number, cell_format)
+            worksheet.write(row, 2, mfp.model, cell_format)
+            worksheet.write(row, 3, mfp.ip_address or '-', cell_format)
+            worksheet.write(row, 4, mfp.cabinet_number or '-', cell_format)
+            worksheet.write(row, 5, mfp.serial_number or '-', cell_format)
+            worksheet.write(row, 6, mfp.mac_address or '-', cell_format)
+            worksheet.write(row, 7, mfp.login or '-', cell_format)
+            worksheet.write(row, 8, mfp.get_status_display(), cell_format)
+            worksheet.write(row, 9, mfp.notes or '-', cell_format)
+            row += 1
+        
+        worksheet.set_column('A:A', 8)
+        worksheet.set_column('B:B', 15)
+        worksheet.set_column('C:C', 25)
+        worksheet.set_column('D:D', 18)
+        worksheet.set_column('E:E', 12)
+        worksheet.set_column('F:F', 18)
+        worksheet.set_column('G:G', 18)
+        worksheet.set_column('H:H', 15)
+        worksheet.set_column('I:I', 15)
+        worksheet.set_column('J:J', 30)
+    
+    def _generate_ups_report(self, workbook, header_format, cell_format, date_format, date_from, date_to):
+        """Отчет по ИБП"""
+        worksheet = workbook.add_worksheet('ИБП')
+        
+        headers = ['ID', 'Номер ОС', 'Модель', 'Статус', 'Аккумулятор', 'Дата замены АКБ', 'Комментарий', 'Рабочее место', 'Сотрудник']
+        for col, header in enumerate(headers):
+            worksheet.write(0, col, header, header_format)
+        
+        upses = UPS.objects.all()
+        row = 1
+        for ups in upses:
+            workplace = Workplace.objects.filter(ups=ups).first()
+            employee = workplace.employee.full_name if workplace else '-'
+            
+            worksheet.write(row, 0, ups.id, cell_format)
+            worksheet.write(row, 1, ups.asset_number, cell_format)
+            worksheet.write(row, 2, ups.model, cell_format)
+            worksheet.write(row, 3, ups.get_status_display(), cell_format)
+            worksheet.write(row, 4, ups.battery_serial_number or '-', cell_format)
+            worksheet.write(row, 5, ups.battery_replaced_at.strftime('%d.%m.%Y') if ups.battery_replaced_at else '-', date_format)
+            worksheet.write(row, 6, ups.comment or '-', cell_format)
+            worksheet.write(row, 7, workplace.location if workplace else '-', cell_format)
+            worksheet.write(row, 8, employee, cell_format)
+            row += 1
+        
+        worksheet.set_column('A:A', 8)
+        worksheet.set_column('B:B', 15)
+        worksheet.set_column('C:C', 25)
+        worksheet.set_column('D:D', 15)
+        worksheet.set_column('E:E', 18)
+        worksheet.set_column('F:F', 15)
+        worksheet.set_column('G:G', 30)
+        worksheet.set_column('H:H', 20)
+        worksheet.set_column('I:I', 25)
+    
+    def _generate_cartridge_report(self, workbook, header_format, cell_format, date_format, date_from, date_to):
+        """Отчет по картриджам"""
+        worksheet = workbook.add_worksheet('Картриджи')
+        
+        headers = ['ID', 'Модель', 'Минск (шт)', 'Мачулищи (шт)', 'Всего (шт)', 'Совместимые МФУ']
+        for col, header in enumerate(headers):
+            worksheet.write(0, col, header, header_format)
+        
+        cartridges = Cartridge.objects.all()
+        row = 1
+        for cart in cartridges:
+            compatible_mfps = ', '.join([m.model for m in cart.compatible_mfps.all()]) or '-'
+            
+            worksheet.write(row, 0, cart.id, cell_format)
+            worksheet.write(row, 1, cart.model, cell_format)
+            worksheet.write(row, 2, cart.quantity_minsk, cell_format)
+            worksheet.write(row, 3, cart.quantity_machulishchi, cell_format)
+            worksheet.write(row, 4, cart.quantity_minsk + cart.quantity_machulishchi, cell_format)
+            worksheet.write(row, 5, compatible_mfps, cell_format)
+            row += 1
+        
+        worksheet.set_column('A:A', 8)
+        worksheet.set_column('B:B', 20)
+        worksheet.set_column('C:C', 12)
+        worksheet.set_column('D:D', 15)
+        worksheet.set_column('E:E', 12)
+        worksheet.set_column('F:F', 30)
+    
+    def _generate_tv_report(self, workbook, header_format, cell_format, date_format, date_from, date_to):
+        """Отчет по телевизорам"""
+        worksheet = workbook.add_worksheet('Телевизоры')
+        
+        headers = ['ID', 'Марка', 'Диагональ', 'Номер ОС', 'Расположение']
+        for col, header in enumerate(headers):
+            worksheet.write(0, col, header, header_format)
+        
+        tvs = TV.objects.all()
+        row = 1
+        for tv in tvs:
+            worksheet.write(row, 0, tv.id, cell_format)
+            worksheet.write(row, 1, tv.brand, cell_format)
+            worksheet.write(row, 2, tv.size, cell_format)
+            worksheet.write(row, 3, tv.asset_number or '-', cell_format)
+            worksheet.write(row, 4, tv.location or '-', cell_format)
+            row += 1
+        
+        worksheet.set_column('A:A', 8)
+        worksheet.set_column('B:B', 20)
+        worksheet.set_column('C:C', 10)
+        worksheet.set_column('D:D', 15)
+        worksheet.set_column('E:E', 30)
 
 class AuthViewSet(GenericViewSet):
     

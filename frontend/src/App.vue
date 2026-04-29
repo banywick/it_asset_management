@@ -37,6 +37,11 @@
       </div>
       
       <div class="nav-right">
+        <!-- Кнопка отчета -->
+        <button @click="openReportModal" class="report-btn" title="Отчет">
+          <i class="fas fa-chart-bar"></i> Отчет
+        </button>
+        
         <div class="user-menu" @click="toggleUserMenu">
           <div class="user-avatar">
             <i class="fas fa-user-circle"></i>
@@ -78,6 +83,9 @@
     <div class="container">
       <router-view />
     </div>
+    
+    <!-- Модальное окно отчета -->
+    <ReportModal v-model:visible="showReportModal" />
   </div>
 </template>
 
@@ -85,6 +93,8 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
+import { showWarning } from './utils/toast'
+import ReportModal from './views/ReportModal.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -95,6 +105,7 @@ const showSuggestions = ref(false)
 const suggestions = ref([])
 const userMenuOpen = ref(false)
 const currentUser = ref(null)
+const showReportModal = ref(false)
 let debounceTimer = null
 
 // Вычисляемое свойство для отображения имени пользователя
@@ -104,6 +115,21 @@ const displayUserName = computed(() => {
   }
   return currentUser.value?.username || 'Гость'
 })
+
+// Проверка авторизации
+const isAuthenticated = () => {
+  return !!currentUser.value
+}
+
+// Открытие модального окна отчета с проверкой авторизации
+const openReportModal = () => {
+  if (!isAuthenticated()) {
+    showWarning('Для доступа к отчетам необходимо авторизоваться')
+    router.push('/login')
+    return
+  }
+  showReportModal.value = true
+}
 
 // Функция для получения подсказок
 const fetchSuggestions = async (query) => {
@@ -192,31 +218,6 @@ const loadCurrentUser = () => {
   }
 }
 
-// Проверка аутентификации на сервере
-const checkAuth = async () => {
-  try {
-    const response = await axios.get(`${API}/auth/check_auth/`, {
-      withCredentials: true
-    })
-    if (response.data.authenticated) {
-      localStorage.setItem('user', JSON.stringify(response.data.user))
-      currentUser.value = response.data.user
-    } else {
-      localStorage.removeItem('user')
-      currentUser.value = null
-      if (route.path !== '/login') {
-        router.push('/login')
-      }
-    }
-  } catch (error) {
-    console.error('Ошибка проверки аутентификации:', error)
-    const storedUser = localStorage.getItem('user')
-    if (storedUser) {
-      currentUser.value = JSON.parse(storedUser)
-    }
-  }
-}
-
 // Событие storage для синхронизации между вкладками
 const handleStorageChange = (event) => {
   if (event.key === 'user') {
@@ -224,7 +225,7 @@ const handleStorageChange = (event) => {
   }
 }
 
-// Следим за изменением маршрута - обновляем пользователя при каждом переходе
+// Следим за изменением маршрута
 watch(() => route.path, () => {
   loadCurrentUser()
   showSuggestions.value = false
@@ -371,11 +372,34 @@ body {
   border-radius: 12px;
 }
 
-/* Стили для пользовательского меню */
+/* Стили для правой части навигации */
 .nav-right {
-  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
+/* Кнопка отчета */
+.report-btn {
+  background: #f39c12;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.report-btn:hover {
+  background: #e67e22;
+  transform: translateY(-2px);
+}
+
+/* Стили для пользовательского меню */
 .user-menu {
   display: flex;
   align-items: center;
@@ -541,6 +565,10 @@ body {
   .user-dropdown {
     right: 0;
     left: auto;
+  }
+  
+  .nav-links {
+    justify-content: center;
   }
 }
 </style>

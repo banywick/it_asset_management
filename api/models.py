@@ -273,4 +273,4 @@ class CartridgeMovement(models.Model):
         ordering = ['-created_at']
     
     def __str__(self):
-        return f"{self.get_movement_type_display()} - {self.cartridge.name} - {self.quantity} шт."
+        return f"{self.get_movement_type_display()} - {self.cartridge.model} - {self.quantity} шт."
