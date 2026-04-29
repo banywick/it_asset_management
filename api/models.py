@@ -20,7 +20,7 @@ class UserProfile(models.Model):
         return f"{self.user.username} - {'Подтвержден' if self.is_approved else 'Ожидает подтверждения'}"
 
 class Department(models.Model):
-    name = models.CharField(max_length=100, verbose_name="Отдел", unique=True)
+    name = models.CharField(max_length=200, verbose_name="Отдел", unique=True)
 
     class Meta:
         verbose_name = "Отдел"
