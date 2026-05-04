@@ -49,7 +49,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
       args:
-        - VITE_API_URL=${VITE_API_URL}  # Передаем аргумент при сборке
+        - VITE_API_URL=https://infobase.okbtsp.com/api
     container_name: it_asset_frontend_prod
     restart: always
     volumes:
