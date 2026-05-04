@@ -3,8 +3,10 @@ Django==4.2.7
 django-cors-headers==4.3.1
 djangorestframework==3.14.0
 et_xmlfile==2.0.0
+gunicorn==25.3.0
 numpy==2.4.4
 openpyxl==3.1.5
+packaging==26.2
 pandas==3.0.2
 pillow==12.2.0
 python-dateutil==2.9.0.post0
@@ -13,4 +15,3 @@ six==1.17.0
 sqlparse==0.5.5
 tzdata==2026.1
 xlsxwriter==3.2.9
-psycopg2-binary==2.9.9
