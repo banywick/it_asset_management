@@ -98,7 +98,7 @@ import ReportModal from './views/ReportModal.vue'
 
 const router = useRouter()
 const route = useRoute()
-const API = 'http://localhost:8000/api'
+const API = '/api'
 
 const searchQuery = ref('')
 const showSuggestions = ref(false)

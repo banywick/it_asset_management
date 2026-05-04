@@ -120,7 +120,7 @@
   import axios from 'axios'
   import { showSuccess, showError, showWarning } from '../utils/toast'
   
-  const API = 'http://localhost:8000/api'
+  const API = '/api'
   const router = useRouter()
   
   const props = defineProps({

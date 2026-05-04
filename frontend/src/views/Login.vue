@@ -154,7 +154,7 @@
   import { showSuccess, showError, showWarning, showInfo } from '../utils/toast'
   
   const router = useRouter()
-  const API = 'http://localhost:8000/api'
+  const API = '/api'
   
   const isRegisterMode = ref(false)
   const loading = ref(false)

@@ -11,5 +11,7 @@ export default defineConfig({
         changeOrigin: true
       }
     }
-  }
+  },
+   // Для продакшена используем относительные пути
+  base: '/',
 })

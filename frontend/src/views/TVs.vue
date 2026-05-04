@@ -162,7 +162,7 @@
   import { showSuccess, showError, showWarning } from '../utils/toast'
   import ConfirmModal from '../components/ConfirmModal.vue'
   
-  const API = 'http://localhost:8000/api'
+  const API = '/api'
   
   // Данные
   const tvs = ref([])

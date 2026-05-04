@@ -255,7 +255,7 @@
   import { showSuccess, showError, showWarning } from '../utils/toast'
   import ConfirmModal from '../components/ConfirmModal.vue'
   
-  const API = 'http://localhost:8000/api'
+  const API = '/api'
   
   const cartridges = ref([])
   const allMFPs = ref([])
