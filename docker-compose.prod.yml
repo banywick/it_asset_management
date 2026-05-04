@@ -48,13 +48,10 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
+      args:
+        - VITE_API_URL=${VITE_API_URL}  # Передаем аргумент при сборке
     container_name: it_asset_frontend_prod
     restart: always
-    env_file:
-      - .env
-      - .env.prod
-    environment:
-      - VITE_API_URL=${VITE_API_URL}
     volumes:
       - frontend_dist:/usr/share/nginx/html
 
