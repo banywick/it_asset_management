@@ -17,3 +17,6 @@ app.use(Vue3Toastify, {
 })
 
 app.mount('#app')
+
+// Экспортируем API URL для использования в других компонентах
+export const API_URL = '/api';

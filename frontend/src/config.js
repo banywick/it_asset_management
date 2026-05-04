@@ -1,6 +1,7 @@
 // frontend/src/config.js
-// Определяем API URL в зависимости от окружения
-const isDev = import.meta.env.DEV;
-const API_URL = isDev ? '/api' : '/api'; // Относительный путь работает везде
+// ВАЖНО: В продакшене используем относительный путь
+// В разработке используем прокси Vite
 
-export { API_URL };
+const API_BASE_URL = '/api';  // Относительный путь для всех окружений
+
+export { API_BASE_URL };
