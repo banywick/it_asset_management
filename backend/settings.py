@@ -93,8 +93,21 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# CORS settings
+# CORS настройки - важно для API
 CORS_ALLOW_ALL_ORIGINS = DEBUG
+
+CORS_ALLOWED_ORIGINS = []
 if not DEBUG:
-    CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
-    CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
+    CORS_ALLOWED_ORIGINS = [
+        'https://infobase.okbtsp.com',
+        'http://infobase.okbtsp.com',
+        'http://localhost',
+        'http://127.0.0.1',
+    ]
+
+# CSRF настройки - ВАЖНО: обязательно с протоколом!
+CSRF_TRUSTED_ORIGINS = [
+    'https://infobase.okbtsp.com',
+    'http://infobase.okbtsp.com',
+    'http://127.0.0.1',
+]
