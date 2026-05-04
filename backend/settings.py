@@ -132,3 +132,14 @@ else:
 # Дополнительно для разработки:
 CORS_ALLOW_CREDENTIALS = True  # Разрешить куки/авторизацию
 CORS_ALLOW_ALL_ORIGINS = False  # Лучше явно указывать
+
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+    ],
+}
