@@ -54,7 +54,7 @@ services:
       - .env
       - .env.prod
     environment:
-      - VITE_API_URL=${VITE_API_URL}
+      - VITE_API_URL:https://infobase.okbtsp.com/api
     volumes:
       - frontend_dist:/usr/share/nginx/html
 
