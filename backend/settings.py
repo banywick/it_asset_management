@@ -96,8 +96,18 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # CORS настройки - важно для API
 CORS_ALLOW_ALL_ORIGINS = DEBUG
 
-CORS_ALLOWED_ORIGINS = []
-if not DEBUG:
+# CORS настройки
+if DEBUG:
+    # В режиме разработки разрешаем все необходимые источники
+    CORS_ALLOWED_ORIGINS = [
+        'http://localhost:5173',      # Vite dev server
+        'http://localhost:5174',      # Альтернативный порт Vite
+        'http://127.0.0.1:5173',
+        'http://localhost:3000',      # React/Vue другой порт
+        'http://localhost:8000',      # Сам бэкенд
+        'http://host.docker.internal:5173',  # Из Docker контейнера
+    ]
+else:
     CORS_ALLOWED_ORIGINS = [
         'https://infobase.okbtsp.com',
         'http://infobase.okbtsp.com',
@@ -106,8 +116,19 @@ if not DEBUG:
     ]
 
 # CSRF настройки - ВАЖНО: обязательно с протоколом!
-CSRF_TRUSTED_ORIGINS = [
-    'https://infobase.okbtsp.com',
-    'http://infobase.okbtsp.com',
-    'http://127.0.0.1',
-]
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS = [
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'http://host.docker.internal:5173',
+    ]
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        'https://infobase.okbtsp.com',
+        'http://infobase.okbtsp.com',
+        'http://127.0.0.1',
+    ]
+
+# Дополнительно для разработки:
+CORS_ALLOW_CREDENTIALS = True  # Разрешить куки/авторизацию
+CORS_ALLOW_ALL_ORIGINS = False  # Лучше явно указывать
