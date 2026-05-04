@@ -25,6 +25,7 @@ services:
       dockerfile: backend/Dockerfile.prod
     container_name: it_asset_backend_prod
     restart: always
+    hostname: backend
     env_file:
       - .env
       - .env.prod
@@ -49,7 +50,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
       args:
-        - VITE_API_URL=https://infobase.okbtsp.com/api
+        - VITE_API_URL=/api
     container_name: it_asset_frontend_prod
     restart: always
     volumes:
