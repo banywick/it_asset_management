@@ -27,7 +27,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /root/.local /root/.local
 
 COPY . .
-COPY entrypoint.sh /entrypoint.sh
+
+# ИСПРАВЛЕНО: правильный путь к entrypoint.sh
+COPY backend/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 ENV PATH=/root/.local/bin:$PATH
