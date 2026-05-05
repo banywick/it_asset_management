@@ -13,8 +13,6 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
       - postgres_data_prod:/var/lib/postgresql/data
-    networks:
-      - it_asset_network_prod
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 10s
@@ -45,8 +43,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    networks:
-      - it_asset_network_prod
 
   frontend:
     build:
@@ -61,8 +57,6 @@ services:
       - VITE_API_URL=${VITE_API_URL}
     volumes:
       - frontend_dist:/usr/share/nginx/html
-    networks:
-      - it_asset_network_prod
 
   nginx:
     image: nginx:alpine
@@ -80,15 +74,9 @@ services:
     depends_on:
       - backend
       - frontend
-    networks:
-      - it_asset_network_prod
 
 volumes:
   postgres_data_prod:
   static_volume_prod:
   media_volume_prod:
   frontend_dist:
-
-networks:
-  it_asset_network_prod:
-    driver: bridge
