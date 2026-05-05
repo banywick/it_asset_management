@@ -13,6 +13,13 @@ from django.db.models import Q
 from django.utils import timezone
 from datetime import datetime, timedelta
 from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+
+
+class CsrfExemptViewSet(viewsets.ModelViewSet):
+    @method_decorator(csrf_exempt)
+    def dispatch(self, request, *args, **kwargs):
+        return super().dispatch(request, *args, **kwargs)
 
 class ReportViewSet(viewsets.GenericViewSet):
     
@@ -337,8 +344,8 @@ class ReportViewSet(viewsets.GenericViewSet):
         worksheet.set_column('D:D', 15)
         worksheet.set_column('E:E', 30)
 
-class AuthViewSet(GenericViewSet):
-    @method_decorator(csrf_exempt)
+class AuthViewSet(CsrfExemptGenericViewSet):
+    
     @action(detail=False, methods=['post'])
     def login(self, request):
         username = request.data.get('username')
