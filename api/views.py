@@ -12,10 +12,7 @@ from django.http import HttpResponse
 from django.db.models import Q
 from django.utils import timezone
 from datetime import datetime, timedelta
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
 
-@method_decorator(csrf_exempt, name='dispatch')
 class ReportViewSet(viewsets.GenericViewSet):
     
     @action(detail=False, methods=['post'])
@@ -339,7 +336,6 @@ class ReportViewSet(viewsets.GenericViewSet):
         worksheet.set_column('D:D', 15)
         worksheet.set_column('E:E', 30)
 
-@method_decorator(csrf_exempt, name='dispatch')
 class AuthViewSet(GenericViewSet):
     
     @action(detail=False, methods=['post'])
@@ -400,56 +396,45 @@ class AuthViewSet(GenericViewSet):
                 'requires_approval': True
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-@method_decorator(csrf_exempt, name='dispatch')
 
-@method_decorator(csrf_exempt, name='dispatch')
 class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = Department.objects.all()
     serializer_class = DepartmentSerializer
 
-@method_decorator(csrf_exempt, name='dispatch')
 class EmployeeViewSet(viewsets.ModelViewSet):
     queryset = Employee.objects.all()
     serializer_class = EmployeeSerializer
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class WorkplaceViewSet(viewsets.ModelViewSet):
     queryset = Workplace.objects.all()
     serializer_class = WorkplaceSerializer
 
-@method_decorator(csrf_exempt, name='dispatch')
 class ComputerViewSet(viewsets.ModelViewSet):
     queryset = Computer.objects.all()
     serializer_class = ComputerSerializer
 
-@method_decorator(csrf_exempt, name='dispatch')
 class MonitorViewSet(viewsets.ModelViewSet):
     queryset = Monitor.objects.all()
     serializer_class = MonitorSerializer
 
-@method_decorator(csrf_exempt, name='dispatch')
 class TVViewSet(viewsets.ModelViewSet):
     queryset = TV.objects.all()
     serializer_class = TVSerializer
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class MFPViewSet(viewsets.ModelViewSet):
     queryset = MFP.objects.all()
     serializer_class = MFPSerializer
 
-@method_decorator(csrf_exempt, name='dispatch')
 class UPSViewSet(viewsets.ModelViewSet):
     queryset = UPS.objects.all()
     serializer_class = UPSSerializer
 
-@method_decorator(csrf_exempt, name='dispatch')
 class LocationViewSet(viewsets.ModelViewSet):
     queryset = Location.objects.all()
     serializer_class = LocationSerializer
 
-@method_decorator(csrf_exempt, name='dispatch')
 class BatteryHistoryViewSet(viewsets.ModelViewSet):
     queryset = BatteryHistory.objects.all()
     serializer_class = BatteryHistorySerializer
@@ -461,7 +446,6 @@ class BatteryHistoryViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(ups_id=ups_id)
         return queryset
     
-@method_decorator(csrf_exempt, name='dispatch')
 class GlobalSearchViewSet(viewsets.GenericViewSet):
     """Глобальный поиск по всем сущностям"""
     
@@ -848,17 +832,13 @@ class GlobalSearchViewSet(viewsets.GenericViewSet):
                     break
         
         return Response(suggestions[:15])
-            
 
 
-
-@method_decorator(csrf_exempt, name='dispatch')
 class CartridgeViewSet(viewsets.ModelViewSet):
     queryset = Cartridge.objects.all()
     serializer_class = CartridgeSerializer
     filterset_fields = ['compatible_mfps']
 
-@method_decorator(csrf_exempt, name='dispatch')
 class CartridgeMovementViewSet(viewsets.ModelViewSet):
     queryset = CartridgeMovement.objects.all()
     serializer_class = CartridgeMovementSerializer
