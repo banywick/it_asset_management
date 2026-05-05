@@ -98,3 +98,12 @@ CORS_ALLOW_ALL_ORIGINS = DEBUG
 if not DEBUG:
     CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
     CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://infobase.okbtsp.com',
+    'http://infobase.okbtsp.com',
+]
+
+# Добавьте также
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
