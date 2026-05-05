@@ -16,10 +16,21 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 
 
-class CsrfExemptViewSet(viewsets.ModelViewSet):
+# ========== БАЗОВЫЙ КЛАСС С CSRF_EXEMPT ==========
+
+class CsrfExemptMixin:
+    """Миксин для отключения CSRF"""
     @method_decorator(csrf_exempt)
     def dispatch(self, request, *args, **kwargs):
         return super().dispatch(request, *args, **kwargs)
+
+class CsrfExemptModelViewSet(CsrfExemptMixin, viewsets.ModelViewSet):
+    """ModelViewSet с отключенным CSRF"""
+    pass
+
+class CsrfExemptGenericViewSet(CsrfExemptMixin, GenericViewSet):
+    """GenericViewSet с отключенным CSRF"""
+    pass
 
 class ReportViewSet(viewsets.GenericViewSet):
     
