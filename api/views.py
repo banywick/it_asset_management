@@ -12,6 +12,7 @@ from django.http import HttpResponse
 from django.db.models import Q
 from django.utils import timezone
 from datetime import datetime, timedelta
+from django.views.decorators.csrf import csrf_exempt
 
 class ReportViewSet(viewsets.GenericViewSet):
     
@@ -337,7 +338,7 @@ class ReportViewSet(viewsets.GenericViewSet):
         worksheet.set_column('E:E', 30)
 
 class AuthViewSet(GenericViewSet):
-    
+    @method_decorator(csrf_exempt)
     @action(detail=False, methods=['post'])
     def login(self, request):
         username = request.data.get('username')
